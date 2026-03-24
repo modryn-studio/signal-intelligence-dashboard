@@ -2,7 +2,7 @@
 
 import useSWR from 'swr'
 import { useState } from 'react'
-import type { Observation } from '@/lib/db'
+import type { Observation } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { AddObservationModal } from '@/components/add-observation-modal'
 

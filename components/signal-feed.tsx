@@ -2,8 +2,8 @@
 
 import useSWR from 'swr'
 import { useState } from 'react'
-import type { SignalInput } from '@/lib/db'
-import { SOURCE_CATEGORIES } from '@/lib/db'
+import type { SignalInput } from '@/lib/types'
+import { SOURCE_CATEGORIES } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { AddInputModal } from '@/components/add-input-modal'
 

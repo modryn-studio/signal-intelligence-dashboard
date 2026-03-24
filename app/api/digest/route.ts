@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import sql from '@/lib/db'
-import { SOURCE_CATEGORIES } from '@/lib/db'
+import { sql } from '@/lib/db'
+import { SOURCE_CATEGORIES } from '@/lib/types'
 
 export async function POST(request: NextRequest) {
   try {
