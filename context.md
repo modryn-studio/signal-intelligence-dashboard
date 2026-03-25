@@ -48,8 +48,7 @@ Current: email-only — no payment gate.
 - `/` → Main dashboard (3-column signal intelligence layout)
 - `/api/inputs` → CRUD for signal inputs
 - `/api/observations` → CRUD for observations
-- `/api/truths` → CRUD for truths
-- `/api/contrarian-truths` → CRUD for contrarian truths
+- `/api/truths` → CRUD for contrarian truths (thesis, conviction level, status lifecycle)
 - `/api/stats` → Aggregate stats for dashboard header
 - `/api/digest` → Weekly digest generation
 - `/api/feedback` → Feedback + newsletter signup (boilerplate standard)

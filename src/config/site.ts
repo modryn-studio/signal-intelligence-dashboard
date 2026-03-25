@@ -6,12 +6,12 @@ export const site = {
   url: 'https://v0-signal-intelligence-dashboard.vercel.app', // TODO: update to custom domain if added
   // Base description — used in <meta description>, manifest, JSON-LD
   description:
-    'A personal system for consuming signal, capturing observations, and forming contrarian truths about the market.',
+    'A personal system for tracking market signals, capturing observations, and forming contrarian theses. Built for solo builders who want to see what others miss.',
   // Used as the <title> tag (homepage + fallback) AND social card title.
   // Pattern: '[Site Name] — [5–7 word tagline describing the tool]'
-  ogTitle: 'Signal Intelligence — Capture Signals, Form Contrarian Truths',
+  ogTitle: 'Signal Intelligence — Train Yourself to See',
   ogDescription:
-    'A personal system for consuming market signal, capturing observations, and forming contrarian truths. Built for solo analysts who think for themselves.',
+    'A personal system for consuming market signal, capturing observations, and forming contrarian truths. Built for solo developers who think for themselves.',
   cta: 'Start observing →',
   founder: 'Luke Hanner',
   email: 'hello@modrynstudio.com',

@@ -26,7 +26,7 @@ Update the following sections based on what changed. Do not touch sections that 
 - **`## Who I Am`** — product description, user types from `brand.md` and `context.md`
 - **`## Stack`** — derive from `package.json` (installed) + `context.md` Stack Additions (not yet installed). Never list a package as installed if it's not in `package.json`.
 - **`## Project Structure`** — any new dirs added to `context.md` Project Structure Additions
-- **`## Route Map`** — every route listed in `context.md` Route Map, one-line description each. Always include `/privacy` and `/terms`.
+- **`## Route Map`** — every route listed in `context.md` Route Map, one-line description each.
 - **`## Brand & Voice`** — voice rules, visual rules, emotional arc, copy rules, user-type-specific rules from `brand.md`
 
 ---
@@ -70,7 +70,27 @@ If both are already accurate, leave the file alone.
 
 ---
 
-## Step 6: Report
+## Step 6: Update `docs/guide.md`
+
+Create the `docs/` directory if it doesn't exist. Generate or update `docs/guide.md` as a first-time user manual based on the **actual current state of the codebase** — not the source docs.
+
+**Read these files:**
+- `src/app/page.tsx` — the main layout and column structure
+- Every file in `src/components/` — panels, modals, forms, header
+- Every file in `src/app/api/` — which routes exist and what they do
+
+**Write the guide with these rules:**
+- Simple language. Step-by-step. Assume the reader has never used the product.
+- Describe what the user literally sees and clicks — exact button labels, exact field names from the component code.
+- Mark stubbed features honestly (e.g. "generates a preview but doesn't send email yet").
+- Never document something that isn't in the code. No aspirational docs.
+- End with a status table: what works ✅, what's stubbed ⏳, what's missing ❌.
+
+If `docs/guide.md` already exists, update it to reflect current state. Remove outdated information. Do not preserve anything that's no longer true.
+
+---
+
+## Step 7: Report
 
 After cascading, report:
 - Which files were changed and which sections were updated
