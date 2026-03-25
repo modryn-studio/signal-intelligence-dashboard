@@ -1,234 +1,251 @@
-# Signal Intelligence — First-Time User Guide
+# Signal Intelligence — Usage Guide
 
 ---
 
-## What you are looking at
+## What this is for
 
-When you open the dashboard you see three columns side by side:
+You are using this dashboard for 3–5 days as a real user, not a tester. The goal is to find a contrarian truth — a belief about a market that most people have not caught up to yet.
+
+Three columns. One direction of travel:
 
 - **Left — Signal Inputs.** What you noticed today.
-- **Center — Observations.** Patterns you are starting to see.
-- **Right — Contrarian Truths.** Beliefs you are forming.
+- **Center — Observations.** Patterns you are starting to see across multiple signals.
+- **Right — Contrarian Truths.** Beliefs you are forming from repeated observations.
 
-At the top is the header. It shows today's date, today's focusing question, your stats, and a 14-day activity streak.
-
-Your inputs, observations, and truths accumulate over time. The question and the Today counter change each day.
+The system is designed to move information left to right. A signal becomes an observation. An observation becomes a thesis. That is the only path.
 
 ---
 
-## Step 1 — Read the daily question
+## Before you start — what to track
 
-At the top of the page, under "Signal Intelligence", there is a question in italics. It is the same question all day — it changes once at midnight and cycles through 7 questions. Examples:
+At the end of each day, note these four numbers somewhere. A note app is fine.
+
+1. How many signals did the agent log?
+2. How many of those did you turn into observations?
+3. How many observations did you attach to a thesis?
+4. How many theses advanced from Forming to Confident?
+
+After 3–5 days, that funnel tells you where the system is working and where it leaks.
+
+---
+
+## Day 1 — Learn the full chain
+
+Do this once on your first session so you know how everything connects.
+
+### 1. Read the daily question
+
+At the top of the page, under "Signal Intelligence", there is a question in italics. It changes once a day at midnight and cycles through 7 questions. Examples:
 
 - _"Where is something growing fast but being served poorly?"_
 - _"What do people keep complaining about that no one has fixed?"_
 - _"What belief do most people in this space hold that is wrong?"_
 
-Hold this question in mind while you browse. That is the whole point of the tool.
+Hold it in mind while you work. Every signal you log should be relevant to it.
+
+### 2. Run the agent
+
+Click **Run Agent** in the top right of the left column.
+
+It fetches recent posts from Hacker News, Product Hunt, Indie Hackers, r/SaaS, and r/Entrepreneur, filters them against today's question using Claude, and logs the most relevant ones. Takes 15–30 seconds. The button shows how many were logged when it finishes.
+
+Agent-logged items are tagged `agent`. They appear in the signal feed like any other input.
+
+### 3. Look at what the agent found
+
+Scan the signal cards. For each one, ask: does this represent a real complaint, a real gap, or a real question that is not being answered well?
+
+If yes — hover over the card. A **→ Observe** button appears.
+
+### 4. Click → Observe on something worth noting
+
+The observation modal opens pre-filled:
+
+- The **body** field contains the signal title. This is your starting point, not your ending point.
+- Rewrite it or add to it. What is the pattern this signal is part of? What have you seen before that rhymes with this?
+- Add a **title** that names the pattern, not the signal. Example: instead of "HN post about Notion being slow", write "Performance complaints about collaboration tools are rising and unsolved."
+- Add tags if you have a recurring theme (e.g. `performance`, `b2b`, `onboarding`).
+
+Click **Save Observation**. It appears in the center column.
+
+### 5. Click → Add to thesis on that observation
+
+Hover over the observation card. Click **→ Add to thesis**.
+
+A picker opens showing your active theses (Forming and Confident). Two options:
+
+- **Click an existing thesis** — the observation attaches to it. The thesis card shows an updated observation count.
+- **+ Create new thesis** at the bottom — opens the thesis form with the observation ID already linked. Fill in your belief, pick a conviction level, submit.
+
+The truth card in the right column will show "1 obs" under the conviction level. That number is your evidence count.
+
+You have just run the full chain: Signal → Observation → Thesis.
 
 ---
 
-## Step 2 — Log a Signal Input
+## Every day after that — the daily sequence (10–20 minutes)
 
-This is always your first action. You need inputs before you can have observations.
+### 1. Read the daily question
 
-**How to do it:**
+It may have rotated since yesterday. Either way, re-read it before doing anything else.
 
-1. In the left column, click **+ Log Input**
-2. A form opens. Fill it in:
-   - **Category** — pick one of four tabs at the top of the form:
-     - `Trends` — something growing or emerging
-     - `Pain` — something broken that people are stuck with
-     - `Indie` — an opportunity someone already found
-     - `Raw` — a search trend or usage number
+### 2. Run the agent or browse manually
 
-   - **Source** — click one of the source pills that appear below the category. These are pre-filled based on the category you picked. You can pick whichever matches where you found it.
+**Run Agent** — click the button, wait 15–30 seconds, review what it found.
 
-   - **What did you find?** _(required)_ — one sentence. What is the signal. Keep it short.
+**Browse manually** — use the six quick-access links below the category tabs in the left column (Hacker News, Product Hunt, Indie Hackers, Exploding Topics, r/SaaS, r/Entrepreneur). Open in a new tab, browse, come back and log what you find with **+ Log Input**.
 
-   - **URL** _(optional)_ — paste the link if you have one. The title in the feed becomes a clickable link.
+Aim for 3–8 signals per session. Quality matters more than quantity.
 
-   - **Notes — what matters here?** _(optional)_ — this is the most important optional field. Write why this caught your attention before you lose the instinct. One or two sentences.
+### 3. Log anything the agent missed that caught your eye
 
-   - **Tags** _(optional)_ — comma-separated labels. e.g. `fintech, onboarding, b2b`. Use the same tags across inputs and observations to connect them later.
+Click **+ Log Input** and fill in:
 
-3. Click **Log Input**. It saves and appears in the left column immediately.
+- **Category** — Trends / Pain / Indie / Raw
+- **Source** — pick the matching source pill
+- **What did you find?** _(required)_ — one sentence
+- **URL** _(optional)_
+- **Notes** _(optional but important)_ — one sentence on why this caught your attention. Write it now before you forget.
+- **Tags** _(optional)_ — use consistent tags so you can connect signals to observations later
 
-**Shortcut:** In the left column, when you are in "All" view, each category group has a small `+ add` link next to its name. Click that to open the form pre-set to that category.
+### 4. Look across all of today's signals
 
----
+Do not look at each signal in isolation. Look at the group. Ask: what are three or four of these saying that they have in common?
 
-## Step 3 — Browse your signal sources (or run the agent)
+If a pattern is visible — hover a signal, click **→ Observe**, write the pattern, not the signal.
 
-You have two options:
+If a pattern is not visible yet — that is fine. Observations are not daily obligations. They are triggered by convergence.
 
-**Option A — Let the agent do it.** Click **Run Agent** next to the “+ Log Input” button. It fetches recent top posts from Hacker News, Product Hunt, Indie Hackers, r/SaaS, and r/Entrepreneur, filters them against today’s focusing question using Claude, and logs the most relevant ones automatically. Items logged this way are tagged `agent` so you can identify them.
+### 5. Review your active theses
 
-It takes 15–30 seconds. When it’s done, the button shows how many signals were logged. The feed refreshes automatically.
+Open the right column. Look at each Forming and Confident thesis.
 
-**Option B — Browse manually.** Below the category filter tabs in the left column, there are six quick-access links:
+Did anything you saw today strengthen it? If yes, hover the relevant observation and click **→ Add to thesis** to attach it.
 
-- Hacker News
-- Product Hunt
-- Indie Hackers
-- Exploding Topics
-- r/SaaS
-- r/Entrepreneur
+Did anything today contradict it? Update your conviction level or click **Invalidate**.
 
-Click any of them to open that site in a new tab. Browse with the daily question in mind. Come back and log what you find.
+Did a thesis accumulate 3+ observations? Consider clicking **Advance →** to move it from Forming to Confident.
 
-**Aim for 2–5 inputs per session.** More is fine. Zero means you did not start.
+### 6. Note your four numbers for the day
 
----
+Before you close the tab, record:
 
-## Step 4 — Filter the feed
-
-Once you have logged a few inputs, you can filter by category using the tabs below the "Signal Inputs" header:
-
-- **All** — shows everything, grouped by category
-- **Trends / Pain / Indie / Raw** — shows only that category
-
-The feed always shows today's inputs only.
-
-**To delete an input:** hover over any input card. A small ✕ appears in the top right corner of the card. Click it to remove it.
+1. Signals logged (agent + manual)
+2. Signals turned into observations
+3. Observations attached to a thesis
+4. Theses advanced
 
 ---
 
-## Step 5 — Capture an Observation
+## Signal card reference
 
-An observation is a pattern, not a note. Write one when you look at several inputs and see the same thing underneath them.
+Each signal card in the left column shows:
 
-**How to do it:**
+- **Title** — the signal, as a link if a URL was attached
+- **Source badge** — where it came from
+- **Category color** — green (trends), orange-red (pain), purple (indie), amber (raw)
+- **Tags** — including `agent` if it was logged by the agent
+- **Timestamp**
+- **Notes** — why it matters, if you wrote one
 
-1. In the center column, click **+ Capture** (or the add button at the top of the observations panel)
-2. A form opens:
-   - **Pattern or insight** _(required)_ — the pattern in one sentence. e.g. _"B2B onboarding is consistently the most complained-about part of every SaaS product"_
+**Hover** to reveal:
 
-   - **Details** _(required)_ — connect the dots. What have you seen repeatedly? Where is the gap? Two to five sentences. No polish needed.
-
-   - **Tags** _(optional)_ — use the same tags you put on the inputs that sparked this.
-
-3. Click **Save Observation**
-
-You do not need to write an observation every day. Write one when something clicks.
+- **✕** — delete the card
+- **→ Observe** — open the observation modal pre-filled with this signal
 
 ---
 
-## Step 6 — Form a Contrarian Truth
+## Observation card reference
 
-A contrarian truth is a thesis. A belief you hold that most people in the space have not caught up to yet.
+Each observation card in the center column shows:
 
-You do not form one until you have enough observations to back it up.
+- **Title** — the pattern name
+- **Body** — the detail and connections
+- **Date**
+- **Tags**
 
-**How to do it:**
+**Hover** to reveal:
 
-1. In the right column, click **+ Add Truth**
-2. A form opens:
-   - **Your thesis** _(required)_ — write the belief in one or two sentences. Be specific. Be bold. e.g. _"Most B2B SaaS companies will lose to vertical AI agents that handle the full workflow, not just the UI."_
-
-   - **Conviction level** — click one of the five buttons:
-     - **1 — Hunch** — you feel something but cannot prove it
-     - **2 — Lean** — you are inclined to believe it
-     - **3 — Believe** — you think it is true
-     - **4 — Confident** — multiple observations back it up
-     - **5 — Certain** — you would bet on it
-
-3. Click **Form Thesis**. It saves with status `forming`.
+- **✕** — delete the observation
+- **→ Add to thesis** — open the thesis picker
 
 ---
 
-## Step 7 — Update a Contrarian Truth over time
+## Truth card reference
 
-Every truth starts as `forming`. As evidence builds, you advance it.
+Each truth card in the right column shows:
 
-**Each truth card shows:**
+- **Thesis** in quotes
+- **Status badge** — Forming / Confident / Validated / Invalidated
+- **Conviction level** — Hunch / Lean / Believe / Confident / Certain (1–5)
+- **N obs** — how many observations are attached
+- **Five dots** on the left — filled to your conviction level
 
-- The thesis in quotes
-- Status badge (Forming / Confident / Validated / Invalidated)
-- Conviction label and number
-- Five small dots on the left — filled in up to your conviction level
+**Hover** to reveal:
 
-**To update a truth:** hover over any truth card. Two buttons appear:
+- **Advance →** — Forming → Confident → Validated
+- **Invalidate** — marks it wrong, fades it out, keeps it in the record
+- **✕** — delete permanently
 
-- **Advance →** — moves the status forward: `forming` → `confident` → `validated`
-- **Invalidate** — marks the truth as wrong. It stays in the archive but fades out.
-
-**To delete a truth:** hover over the card and click the small ✕ on the right.
-
-**Filter by status:** use the tabs at the top of the right column — Active (forming + confident), Forming, Confident, Validated, Invalidated.
+**Filter by status** using the tabs above the list: Active, Validated, Invalidated.
 
 ---
 
-## Step 8 — Check your stats
+## Stats and streak
 
-The header shows three numbers at all times:
+The header shows:
 
-- **Today** — how many inputs you have logged today
-- **Observations** — total observations ever
-- **Theses** — total contrarian truths ever
-
-The 14 small squares in the top right are your 14-day streak. Each square is one day:
-
-- Dark green = 5+ inputs that day
-- Medium green = 2–4 inputs
-- Faint green = 1 input
-- Empty = nothing logged
-
-Do it daily and the streak fills in. Gaps are honest feedback.
+- **Today** — inputs logged today
+- **Observations** — total ever
+- **Theses** — total ever
+- **14-day streak** — one square per day. Dark green = 5+ inputs. Medium = 2–4. Faint = 1. Empty = nothing.
 
 ---
 
-## Step 9 — Generate a Digest
+## Digest
 
-When you want a summary of what you have spotted, click **Digest** in the top right header (the button with the pulsing green dot).
+Click **Digest** in the header. Enter your email. Click **Send Digest**.
 
-**How it works:**
-
-1. A modal opens. Enter your email address.
-2. Click **Send Digest**
-3. The system generates a summary and shows you:
-   - How many inputs are included
-   - How many observations
-   - How many active theses
-
-> **Note:** The digest generates a preview but does not send an email yet. Email delivery will be wired in using Resend. For now, you can see the counts and use it as a manual checkpoint.
+It shows counts of what is in the system. Email delivery is not wired yet — treat it as a checkpoint, not an email.
 
 ---
 
-## Step 10 — Switch between light and dark mode
+## Light / dark mode
 
-Top right corner of the header. Click the sun or moon icon. That is all.
+Top right corner of the header. Sun or moon icon.
 
 ---
 
-## Daily habit — the full sequence
+## What to bring back after 3–5 days
 
-Do this in 10–20 minutes:
+Before Phase 2 of development starts, answer these questions from your actual usage:
 
-1. Open the dashboard
-2. Read the daily question at the top
-3. Click through two or three of the quick-access links in the left column
-4. Log 2–5 inputs — one sentence each, category, source, and a quick note on why it matters
-5. Look at what you logged. Do any inputs connect? If yes, write an observation.
-6. Check your active truths in the right column. Does anything you saw today change your conviction level? Advance or invalidate accordingly.
+1. **The funnel:** How many signals → how many observations → how many theses → how many advanced?
+2. **Where did it stall?** Was it hard to find signals worth observing? Was it hard to connect observations to theses? Did no thesis feel worth advancing?
+3. **Was the → Observe pre-fill useful?** Did the signal title give you a starting point, or did you erase it and start from scratch anyway?
+4. **Was the thesis picker useful?** When you clicked "→ Add to thesis", did the list of existing theses make you think "yes, this fits"? Or did nothing feel like a match?
+5. **Agent quality:** Of the signals the agent logged, how many were actually worth observing? What fraction felt like noise?
 
-Do this every day for two weeks. Patterns emerge that you cannot see by reading alone.
+Those five answers shape what gets built next. Write them in a comment on GitHub Issue #2.
 
 ---
 
 ## What is not working yet
 
-| Feature                                 | Status                                                         |
-| --------------------------------------- | -------------------------------------------------------------- |
-| Logging signal inputs                   | ✅ Working                                                     |
-| Run Agent (HN + Reddit + Product Hunt + Indie Hackers → Claude)        | ✅ Working — requires ANTHROPIC_API_KEY in env                 |
-| Filtering by category                   | ✅ Working                                                     |
-| Logging observations                    | ✅ Working                                                     |
-| Forming and advancing contrarian truths | ✅ Working                                                     |
-| Stats and streak                        | ✅ Working                                                     |
-| Digest preview (counts)                 | ✅ Working                                                     |
-| Digest email delivery                   | ⏳ Not wired — email provider (Resend) not yet connected       |
-| URL metadata auto-fill                  | ⏳ Not built — paste URL manually and write the title yourself |
+| Feature | Status |
+| --- | --- |
+| Logging signal inputs | ✅ Working |
+| Run Agent (HN + Product Hunt + Indie Hackers + Reddit → Claude) | ✅ Working — requires `ANTHROPIC_API_KEY` in env |
+| → Observe button on signal cards | ✅ Working |
+| → Add to thesis button on observation cards | ✅ Working |
+| Thesis picker with escape hatch | ✅ Working |
+| Observation count on truth cards | ✅ Working |
+| Filtering by category | ✅ Working |
+| Stats and streak | ✅ Working |
+| Digest preview (counts) | ✅ Working |
+| Digest email delivery | ⏳ Not wired — Resend not connected |
+| URL metadata auto-fill | ⏳ Not built — paste URL and write title manually |
+| Agent reason field ("Flagged because...") | ⏳ Phase 2 — coming with the prompt rewrite |
 
 ---
 
