@@ -13,6 +13,7 @@ Run this any time you edit `context.md` or `brand.md`. Do not run `/setup` again
 ## Step 1: Read the source files
 
 Read all three source files:
+
 1. `context.md` — product name, URL, target user, stack, routes, monetization, analytics events
 2. `brand.md` — voice rules, visual rules, user types, emotional arc, copy examples
 3. `development-principles.md` — product philosophy (rarely changes, but check it)
@@ -26,7 +27,7 @@ Update the following sections based on what changed. Do not touch sections that 
 - **`## Who I Am`** — product description, user types from `brand.md` and `context.md`
 - **`## Stack`** — derive from `package.json` (installed) + `context.md` Stack Additions (not yet installed). Never list a package as installed if it's not in `package.json`.
 - **`## Project Structure`** — any new dirs added to `context.md` Project Structure Additions
-- **`## Route Map`** — every route listed in `context.md` Route Map, one-line description each.
+- **`## Route Map`** — every route listed in `context.md` Route Map, one-line description each. Always include `/privacy` and `/terms`.
 - **`## Brand & Voice`** — voice rules, visual rules, emotional arc, copy rules, user-type-specific rules from `brand.md`
 
 ---
@@ -75,11 +76,13 @@ If both are already accurate, leave the file alone.
 Create the `docs/` directory if it doesn't exist. Generate or update `docs/guide.md` as a first-time user manual based on the **actual current state of the codebase** — not the source docs.
 
 **Read these files:**
+
 - `src/app/page.tsx` — the main layout and column structure
 - Every file in `src/components/` — panels, modals, forms, header
 - Every file in `src/app/api/` — which routes exist and what they do
 
 **Write the guide with these rules:**
+
 - Simple language. Step-by-step. Assume the reader has never used the product.
 - Describe what the user literally sees and clicks — exact button labels, exact field names from the component code.
 - Mark stubbed features honestly (e.g. "generates a preview but doesn't send email yet").
@@ -93,6 +96,7 @@ If `docs/guide.md` already exists, update it to reflect current state. Remove ou
 ## Step 7: Report
 
 After cascading, report:
+
 - Which files were changed and which sections were updated
 - Which files were already in sync (no changes needed)
 - Anything in `context.md` or `brand.md` that is incomplete, contradictory, or missing that could cause issues later (flag but do not invent)
