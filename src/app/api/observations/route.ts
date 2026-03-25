@@ -3,14 +3,22 @@ import { sql } from '@/lib/db'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
+  const tag = searchParams.get('tag')
   const limit = parseInt(searchParams.get('limit') || '30')
 
   try {
-    const observations = await sql`
-      SELECT * FROM observations
-      ORDER BY created_at DESC
-      LIMIT ${limit}
-    `
+    const observations = tag
+      ? await sql`
+          SELECT * FROM observations
+          WHERE ${tag} = ANY(tags)
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `
+      : await sql`
+          SELECT * FROM observations
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `
     return NextResponse.json(observations)
   } catch (error) {
     console.error('[observations] GET error:', error)

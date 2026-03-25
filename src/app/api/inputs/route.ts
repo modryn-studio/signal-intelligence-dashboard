@@ -5,14 +5,36 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const date = searchParams.get('date')
   const category = searchParams.get('category')
+  const tag = searchParams.get('tag')
   const limit = parseInt(searchParams.get('limit') || '50')
 
   try {
     let inputs
-    if (date && category) {
+    if (date && category && tag) {
+      inputs = await sql`
+        SELECT * FROM signal_inputs
+        WHERE date = ${date} AND source_category = ${category} AND ${tag} = ANY(tags)
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `
+    } else if (date && category) {
       inputs = await sql`
         SELECT * FROM signal_inputs
         WHERE date = ${date} AND source_category = ${category}
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `
+    } else if (date && tag) {
+      inputs = await sql`
+        SELECT * FROM signal_inputs
+        WHERE date = ${date} AND ${tag} = ANY(tags)
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `
+    } else if (category && tag) {
+      inputs = await sql`
+        SELECT * FROM signal_inputs
+        WHERE source_category = ${category} AND ${tag} = ANY(tags)
         ORDER BY created_at DESC
         LIMIT ${limit}
       `
@@ -27,6 +49,13 @@ export async function GET(request: NextRequest) {
       inputs = await sql`
         SELECT * FROM signal_inputs
         WHERE source_category = ${category}
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `
+    } else if (tag) {
+      inputs = await sql`
+        SELECT * FROM signal_inputs
+        WHERE ${tag} = ANY(tags)
         ORDER BY created_at DESC
         LIMIT ${limit}
       `
