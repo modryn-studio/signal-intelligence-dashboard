@@ -1,6 +1,6 @@
 # scripts/generate-palette.ps1
 # ------------------------------------------------------------------------------
-# Generates public/brand/palette.png — a 1000x180 color swatch sheet — by
+# Generates public/brand/palette.png â€” a 1000x180 color swatch sheet â€” by
 # reading the 5 color tokens from app/globals.css @theme inline block.
 #
 # Run any time after filling in colors in globals.css. No logomark required.
@@ -32,7 +32,7 @@ if (-not (Get-Command magick -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-$cssPath = "app\globals.css"
+$cssPath = "src\app\globals.css"
 if (-not (Test-Path $cssPath)) {
     Write-Host ""
     Write-Host "  ERROR: $cssPath not found." -ForegroundColor Red
@@ -78,7 +78,7 @@ foreach ($label in $palette.Keys) {
     $hex = $palette[$label]
     $out = "tmp_sw_$idx.png"
     $tmpFiles += $out
-    # Each swatch: 200x180 — top 120px solid color, bottom 60px cream label strip
+    # Each swatch: 200x180 â€” top 120px solid color, bottom 60px cream label strip
     magick `
         '(' -size 200x120 xc:"$hex" ')' `
         '(' -size 200x60 xc:'#FFFAF5' `

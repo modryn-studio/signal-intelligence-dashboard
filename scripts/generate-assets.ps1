@@ -78,7 +78,7 @@ if ($hasAlpha -eq "False") {
 # -- Read site name + brand bg color from config/site.ts ----------------------
 $siteName = "Your Site"
 $bgColor  = "#111111"
-$siteTs   = "config\site.ts"
+$siteTs   = "src\config\site.ts"
 if (Test-Path $siteTs) {
     $nameLine = Select-String -Path $siteTs -Pattern "name:\s*'([^']+)'" | Select-Object -First 1
     if ($nameLine) {
@@ -106,7 +106,7 @@ Write-Host ""
 Write-Host "  Generating assets - site: $siteName" -ForegroundColor Cyan
 Write-Host ""
 
-if (-not (Test-Path "app")) { New-Item -ItemType Directory -Path "app" | Out-Null }
+if (-not (Test-Path "src\app")) { New-Item -ItemType Directory -Path "src\app" | Out-Null }
 
 # -- Detect mark type ----------------------------------------------------------
 $maxSat      = [float](magick $logomark -colorspace HSL -channel Saturation -separate -format "%[fx:maxima]" info: 2>$null)
@@ -115,18 +115,18 @@ $isGrayscale = $maxSat -lt 0.05
 $negateFrag  = if ($isGrayscale) { @('-channel', 'RGB', '-negate') } else { @() }
 
 # -- icon.png - browser tab favicon --------------------------------------------
-magick $logomark -background none -trim +repage -resize 1024x1024 -gravity Center -background none -extent 1024x1024 "app\icon.png"
+magick $logomark -background none -trim +repage -resize 1024x1024 -gravity Center -background none -extent 1024x1024 "src\app\icon.png"
 Write-Host "  + app/icon.png"
 
 # -- favicon.ico - legacy multi-resolution -------------------------------------
-magick $logomark -background none -trim +repage -resize 256x256 -gravity Center -background none -extent 256x256 -define icon:auto-resize=48,32,16 "app\favicon.ico"
+magick $logomark -background none -trim +repage -resize 256x256 -gravity Center -background none -extent 256x256 -define icon:auto-resize=48,32,16 "src\app\favicon.ico"
 Write-Host "  + app/favicon.ico"
 
 # -- apple-icon.png - iOS home screen ------------------------------------------
 # iOS does not support transparent icons - always composite onto brand bg.
 magick -size 180x180 xc:"$bgColor" `
     '(' $logomark -background none -trim +repage $negateFrag -resize 140x140 ')' `
-    -gravity Center -composite "app\apple-icon.png"
+    -gravity Center -composite "src\app\apple-icon.png"
 Write-Host "  + app/apple-icon.png"
 
 # -- Favicon pair - light / dark mode ------------------------------------------
