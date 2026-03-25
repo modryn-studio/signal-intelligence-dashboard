@@ -2,6 +2,8 @@
 
 import useSWR from 'swr'
 import { useState } from 'react'
+import { useTheme } from 'next-themes'
+import { Sun, Moon } from 'lucide-react'
 import { DigestModal } from '@/components/digest-modal'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
@@ -58,6 +60,7 @@ function StreakDots({ streak }: { streak: { date: string; count: number }[] }) {
 export function DashboardHeader() {
   const { data: stats } = useSWR<Stats>('/api/stats', fetcher, { refreshInterval: 60000 })
   const [digestOpen, setDigestOpen] = useState(false)
+  const { resolvedTheme, setTheme } = useTheme()
 
   const today = new Date()
   const dateStr = today.toLocaleDateString('en-US', {
@@ -92,7 +95,7 @@ export function DashboardHeader() {
           </div>
 
           {/* Center: stats */}
-          <div className="hidden md:flex items-center gap-6 flex-shrink-0">
+          <div className="hidden md:flex items-center gap-6 shrink-0">
             <div className="text-center">
               <p className="text-lg font-bold text-foreground font-mono leading-none">
                 {stats?.today_inputs ?? '—'}
@@ -116,7 +119,7 @@ export function DashboardHeader() {
           </div>
 
           {/* Right: streak + digest */}
-          <div className="flex items-center gap-4 flex-shrink-0">
+          <div className="flex items-center gap-4 shrink-0">
             <div className="hidden lg:flex flex-col gap-1">
               <p className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-wider">14-day streak</p>
               <StreakDots streak={stats?.recent_streak || []} />
@@ -127,6 +130,13 @@ export function DashboardHeader() {
             >
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
               Digest
+            </button>
+            <button
+              onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+              className="p-1.5 border border-border rounded text-muted-foreground hover:text-foreground hover:border-muted-foreground transition-colors"
+              aria-label="Toggle theme"
+            >
+              {resolvedTheme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
             </button>
           </div>
         </div>

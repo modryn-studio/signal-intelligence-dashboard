@@ -5,6 +5,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
 import { SiteSchema } from '@/components/site-schema'
 import FeedbackWidget from '@/components/feedback-widget'
+import { ThemeProvider } from '@/components/theme-provider'
 import { site } from '@/config/site'
 import './globals.css'
 
@@ -42,13 +43,15 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
-        <SiteSchema />
-        {children}
-        <Toaster theme="dark" />
-        <FeedbackWidget />
-        <Analytics />
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <SiteSchema />
+          {children}
+          <Toaster />
+          <FeedbackWidget />
+          <Analytics />
+        </ThemeProvider>
       </body>
     </html>
   )

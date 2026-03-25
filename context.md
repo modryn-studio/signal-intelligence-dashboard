@@ -2,19 +2,19 @@
 
 ## Core Framework
 
-Market: Solo analysts, indie researchers, and product builders who track market signals daily.
+Market: Solo developers and indie builders optimizing for lifestyle and freedom — people who want to observe market signals intelligently before committing to a project.
 
-Reference product (what people pay for): Bloomberg Terminal, Feedly Pro, Refind. The common thread — people pay for curated signal with less noise.
+Reference product (what people pay for): Exploding Topics Pro ($49/mo) — people pay to discover trending topics before they peak. Top complaint: too broad, not actionable for solo builders, no way to capture personal observations alongside the data.
 
-Your angle: Personal intelligence system you own and control. No subscriptions, no vendor lock-in. Raw SQL, raw observations, raw contrarian bets — all yours.
+Your angle: Same job (spot emerging opportunities) — but built as a personal intelligence system, not a trend database. Free, self-hosted, focused on one question: "Where is something growing fast but being served poorly?" No noise. No subscription. Yours.
 
 ## Product
 
-A private dashboard for ingesting market signals, logging observations, and crystallizing contrarian truths. Three-column layout: signal feed → observations → truths. Weekly email digest output.
+A personal daily dashboard that aggregates market signal sources, prompts you with a single focusing question each day, and lets you capture and track observations over time — so patterns surface and contrarian insights emerge. Three-column layout: signal feed → observations → truths. Weekly email digest output.
 
 ## Target User
 
-A solo founder or product builder who reads a lot, thinks they spot things others miss, and wants a system to prove it over time instead of letting insights evaporate in a chat thread.
+A solo developer who wants to build a lifestyle business but doesn't know where to start. They're not looking for a trend report — they're trying to train themselves to see what others miss. They already know how to build. They don't yet know what to build.
 
 ## Deployment
 
