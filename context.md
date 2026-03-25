@@ -48,11 +48,25 @@ Current: email-only — no payment gate.
 
 - `/` → Main dashboard (3-column signal intelligence layout)
 - `/api/inputs` → CRUD for signal inputs
-- `/api/observations` → CRUD for observations
-- `/api/truths` → CRUD for contrarian truths (thesis, conviction level, status lifecycle)
+- `/api/observations` → CRUD for observations (stores `related_input_ids INT[]` linking back to signal inputs)
+- `/api/truths` → CRUD for contrarian truths (thesis, conviction level, status lifecycle, `supporting_observations INT[]`)
 - `/api/stats` → Aggregate stats for dashboard header
 - `/api/digest` → Weekly digest generation
 - `/api/feedback` → Feedback + newsletter signup (boilerplate standard)
+- `/api/agent/run` → POST — fetches HN, Product Hunt, Indie Hackers, r/SaaS, r/Entrepreneur; filters via Claude (claude-sonnet-4-6); inserts to signal_inputs tagged `agent`
+
+## Current State (as of March 25, 2026)
+
+Insight chain is fully wired: Signal → Observation → Thesis.
+
+- Signal cards have a hover-revealed "→ Observe" button. Opens AddObservationModal pre-filled with the signal title and `related_input_ids`.
+- Observation cards have a hover-revealed "→ Add to thesis" button. Opens ObservationTruthPickerModal — a picker of active theses with a "+ Create new thesis" escape hatch at the bottom.
+- PATCH `/api/truths` accepts `appendObservationId` — uses `array_append()` to merge without overwriting.
+- Truth cards show `supporting_observations.length` as "N obs".
+
+Phase 2 is planned but on hold. Using the system for 3–5 days first to validate the chain produces insight before improving the agent. Tracked in GitHub Issue #2.
+
+Phase 2 will: add a two-step Claude classification chain, include HN comment counts, rewrite the agent prompt for "high pain, low solution density", add a `reason` field per selected signal, and fix the Product Hunt date filter.
 
 ## Monetization
 
