@@ -23,8 +23,8 @@ export const site = {
     success: "You're in. First digest hits your inbox soon.",
   },
   // Brand colors — used in manifest theme_color / background_color
-  accent: '#4ade80',  // green — primary action color
-  bg: '#111111',      // near-black background
+  accent: '#4ade80', // green — primary action color
+  bg: '#111111', // near-black background
   // Social profiles
   social: {
     twitter: 'https://x.com/lukehanner',

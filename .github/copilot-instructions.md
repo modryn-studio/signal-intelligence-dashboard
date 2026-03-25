@@ -52,6 +52,7 @@ schema.sql              → one-time Neon DB bootstrap (already run)
 ## Brand & Voice
 
 **Voice rules:**
+
 - Short sentences. Direct. No setup. Every word earns its place.
 - Confident without being arrogant. This tool knows what it is.
 - Honest about what doesn't exist yet. No fake polish on unfinished things.
@@ -61,6 +62,7 @@ schema.sql              → one-time Neon DB bootstrap (already run)
 A solo developer who knows how to build but doesn't yet know what to build. Disciplined, impatient with noise, optimizing for freedom over growth. They want a system that trains them to see — not another dashboard that dumps data on them.
 
 **Visual Rules:**
+
 - Light and dark mode. Defaults to system preference. Theme toggle in the dashboard header.
 - Fonts: Space Grotesk (headlines) + Space Mono (badges, tags, code, timestamps). Currently Inter + JetBrains Mono — migration pending.
 - Motion: Minimal. Subtle fade on load. Nothing moves unless it has to.
@@ -68,12 +70,14 @@ A solo developer who knows how to build but doesn't yet know what to build. Disc
 - Accent green (`oklch(0.75 0.18 142)` dark / `oklch(0.52 0.18 142)` light) is the single identity color.
 
 **Emotional Arc:**
+
 - Land: "This is exactly what I needed and didn't know existed."
 - Read: "This person thinks the way I think."
 - Scroll: "I want to use this today."
 - Convert: "I'm building this into my daily routine."
 
 **Copy Reference:**
+
 - Hero: "Train yourself to see what others miss."
 - CTA: "Start observing."
 - Daily prompt: "Where is something growing fast but being served poorly?"
@@ -131,7 +135,7 @@ This project uses Tailwind CSS v4. The rules are different from v3 — follow th
 @theme {
   --color-accent: oklch(0.75 0.18 142); /* green signal color — dark mode primary */
   --color-secondary: oklch(0.72 0.19 27); /* orange-red — warnings, contrarian markers */
-  --color-bg: oklch(0.10 0 0); /* near-black page background (dark) */
+  --color-bg: oklch(0.1 0 0); /* near-black page background (dark) */
   --color-text: oklch(0.92 0 0); /* near-white body text (dark) */
   --color-muted: oklch(0.65 0 0); /* secondary text, placeholders */
   --color-surface: oklch(0.14 0 0); /* card/panel surface (dark) */

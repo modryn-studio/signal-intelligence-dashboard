@@ -95,10 +95,10 @@ export function ObservationsPanel() {
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto pr-1">
         {(!observations || observations.length === 0) && (
           <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
-            <p className="text-muted-foreground/40 font-mono text-xs tracking-widest uppercase">
+            <p className="text-muted-foreground/70 font-mono text-xs tracking-widest uppercase">
               No observations yet
             </p>
-            <p className="text-muted-foreground/30 max-w-48 text-xs leading-relaxed">
+            <p className="text-muted-foreground/55 max-w-48 text-xs leading-relaxed">
               After consuming signal, what patterns do you keep noticing?
             </p>
             <Button

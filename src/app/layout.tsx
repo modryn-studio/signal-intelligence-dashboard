@@ -4,7 +4,6 @@ import { JetBrains_Mono } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/next';
 import { Toaster } from '@/components/ui/sonner';
 import { SiteSchema } from '@/components/site-schema';
-import FeedbackWidget from '@/components/feedback-widget';
 import { ThemeProvider } from '@/components/theme-provider';
 import { site } from '@/config/site';
 import './globals.css';
@@ -49,7 +48,6 @@ export default function RootLayout({
           <SiteSchema />
           {children}
           <Toaster />
-          <FeedbackWidget />
           <Analytics />
         </ThemeProvider>
       </body>

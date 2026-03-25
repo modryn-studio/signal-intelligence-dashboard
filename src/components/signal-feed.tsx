@@ -232,10 +232,10 @@ export function SignalFeed() {
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto pr-1">
         {(!inputs || inputs.length === 0) && (
           <div className="border-border flex flex-col items-center justify-center gap-3 rounded border border-dashed py-12 text-center">
-            <p className="text-muted-foreground/50 font-mono text-xs tracking-widest uppercase">
+            <p className="text-muted-foreground/75 font-mono text-xs tracking-widest uppercase">
               No inputs yet today
             </p>
-            <p className="text-muted-foreground/40 max-w-48 text-xs leading-relaxed">
+            <p className="text-muted-foreground/60 max-w-48 text-xs leading-relaxed">
               Start consuming with the question: &ldquo;Where is something growing fast but being
               served poorly?&rdquo;
             </p>
