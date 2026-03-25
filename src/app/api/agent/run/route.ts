@@ -113,15 +113,52 @@ async function fetchProductHunt(): Promise<FetchedItem[]> {
   }
 }
 
+async function fetchIndieHackers(): Promise<FetchedItem[]> {
+  try {
+    // IH is SSR — post data is embedded in __NEXT_DATA__ on the page
+    const res = await fetch('https://www.indiehackers.com/posts?filter=top&period=week', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; signal-intelligence-dashboard/1.0)',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+      cache: 'no-store',
+    });
+    if (!res.ok) return [];
+    const html = await res.text();
+
+    const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (!match?.[1]) return [];
+
+    const nextData = JSON.parse(match[1]) as Record<string, unknown>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pageProps = (nextData as any)?.props?.pageProps;
+    const posts: Array<Record<string, unknown>> =
+      pageProps?.posts ?? pageProps?.stories ?? pageProps?.feed ?? [];
+
+    return posts
+      .slice(0, 25)
+      .map((post, i) => ({
+        id: `ih_${(post.id as string) ?? (post.slug as string) ?? i}`,
+        title: (post.title as string) ?? (post.rawTitle as string) ?? '',
+        url:
+          (post.url as string) ??
+          `https://www.indiehackers.com/post/${post.slug as string}`,
+        source: 'Indie Hackers',
+        defaultCategory: 'indie' as SourceCategory,
+        score: (post.upvoteCount as number) ?? (post.score as number) ?? 0,
+      }))
+      .filter((item) => item.title);
+  } catch {
+    return [];
+  }
+}
+
 async function fetchReddit(subreddit: string): Promise<FetchedItem[]> {
   try {
-    const res = await fetch(
-      `https://www.reddit.com/r/${subreddit}/top.json?t=day&limit=25`,
-      {
-        headers: { 'User-Agent': 'signal-intelligence-dashboard/1.0' },
-        cache: 'no-store',
-      }
-    );
+    const res = await fetch(`https://www.reddit.com/r/${subreddit}/top.json?t=day&limit=25`, {
+      headers: { 'User-Agent': 'signal-intelligence-dashboard/1.0' },
+      cache: 'no-store',
+    });
     if (!res.ok) return [];
     const data = (await res.json()) as {
       data: {
@@ -147,19 +184,27 @@ export async function POST(_req: Request): Promise<Response> {
     const question = getTodayQuestion();
     log.info(ctx.reqId, 'Fetching sources', { question });
 
-    const [hn, redditSaas, redditEnt, productHunt] = await Promise.all([
+    const [hn, redditSaas, redditEnt, productHunt, indieHackers] = await Promise.all([
       fetchHN(),
       fetchReddit('SaaS'),
       fetchReddit('Entrepreneur'),
       fetchProductHunt(),
+      fetchIndieHackers(),
     ]);
 
-    const allItems: FetchedItem[] = [...hn, ...redditSaas, ...redditEnt, ...productHunt];
+    const allItems: FetchedItem[] = [
+      ...hn,
+      ...redditSaas,
+      ...redditEnt,
+      ...productHunt,
+      ...indieHackers,
+    ];
     log.info(ctx.reqId, 'Fetched', {
       hn: hn.length,
       redditSaas: redditSaas.length,
       redditEnt: redditEnt.length,
       productHunt: productHunt.length,
+      indieHackers: indieHackers.length,
       total: allItems.length,
     });
 
@@ -178,7 +223,7 @@ export async function POST(_req: Request): Promise<Response> {
 
       const prompt = `Today's focusing question: "${question}"
 
-Below are ${allItems.length} recent posts from Hacker News, Product Hunt, r/SaaS, and r/Entrepreneur. Select the 8 to 12 most relevant to the focusing question. For each, assign source_category (trends, complaints, indie, or data — judge by content, not by source) and write a one-line note explaining what the signal is and why it matters to someone looking for underserved markets.
+Below are ${allItems.length} recent posts from Hacker News, Product Hunt, Indie Hackers, r/SaaS, and r/Entrepreneur. Select the 8 to 12 most relevant to the focusing question. For each, assign source_category (trends, complaints, indie, or data — judge by content, not by source) and write a one-line note explaining what the signal is and why it matters to someone looking for underserved markets.
 
 Items:
 ${JSON.stringify(itemsForPrompt, null, 2)}
@@ -193,8 +238,7 @@ Respond with ONLY valid JSON, no markdown fences, no explanation:
         messages: [{ role: 'user', content: prompt }],
       });
 
-      const raw =
-        message.content[0].type === 'text' ? message.content[0].text.trim() : '{}';
+      const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : '{}';
       const parsed = JSON.parse(raw) as { selected: ClaudeSelected[] };
       selected = parsed.selected || [];
       log.info(ctx.reqId, 'Claude selected', { count: selected.length });
@@ -232,11 +276,10 @@ Respond with ONLY valid JSON, no markdown fences, no explanation:
       logged++;
     }
 
-    return log.end(
-      ctx,
-      Response.json({ logged, fetched: allItems.length, question }),
-      { logged, fetched: allItems.length }
-    );
+    return log.end(ctx, Response.json({ logged, fetched: allItems.length, question }), {
+      logged,
+      fetched: allItems.length,
+    });
   } catch (error) {
     log.err(ctx, error);
     return Response.json({ error: 'Agent run failed' }, { status: 500 });
