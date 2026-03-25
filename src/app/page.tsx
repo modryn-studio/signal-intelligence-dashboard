@@ -1,7 +1,12 @@
+import type { Metadata } from 'next'
 import { DashboardHeader } from '@/components/dashboard-header'
 import { SignalFeed } from '@/components/signal-feed'
 import { ObservationsPanel } from '@/components/observations-panel'
 import { ContrarianTruthsPanel } from '@/components/contrarian-truths-panel'
+
+export const metadata: Metadata = {
+  title: 'Signal Intelligence — Daily Dashboard',
+}
 
 export default function DashboardPage() {
   return (
