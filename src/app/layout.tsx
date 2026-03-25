@@ -1,0 +1,55 @@
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import { JetBrains_Mono } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/next'
+import { Toaster } from '@/components/ui/sonner'
+import { SiteSchema } from '@/components/site-schema'
+import FeedbackWidget from '@/components/feedback-widget'
+import { site } from '@/config/site'
+import './globals.css'
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+})
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains-mono',
+})
+
+export const metadata: Metadata = {
+  title: site.ogTitle,
+  description: site.description,
+  openGraph: {
+    title: site.ogTitle,
+    description: site.ogDescription,
+    url: site.url,
+    siteName: site.name,
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: site.ogTitle,
+    description: site.ogDescription,
+    creator: site.social.twitterHandle,
+  },
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang="en" className="dark">
+      <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
+        <SiteSchema />
+        {children}
+        <Toaster theme="dark" />
+        <FeedbackWidget />
+        <Analytics />
+      </body>
+    </html>
+  )
+}
