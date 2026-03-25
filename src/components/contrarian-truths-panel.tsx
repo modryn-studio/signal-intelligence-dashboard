@@ -15,6 +15,7 @@ interface ContrarianTruth {
   thesis: string;
   conviction_level: 1 | 2 | 3 | 4 | 5;
   status: Status;
+  supporting_observations: number[];
   created_at: string;
   updated_at: string;
 }
@@ -121,6 +122,11 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
             <span className="text-muted-foreground font-mono text-[10px]">
               {CONVICTION_LABELS[truth.conviction_level]} ({truth.conviction_level}/5)
             </span>
+            {(truth.supporting_observations?.length ?? 0) > 0 && (
+              <span className="text-muted-foreground font-mono text-[10px]">
+                &middot; {truth.supporting_observations.length} obs
+              </span>
+            )}
             <span className="text-muted-foreground ml-auto font-mono text-[10px]">
               {new Date(truth.created_at).toLocaleDateString('en-US', {
                 month: 'short',

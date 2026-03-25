@@ -43,20 +43,33 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, conviction_level, status, thesis } = body
+    const { id, conviction_level, status, thesis, appendObservationId } = body
 
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
-    const [truth] = await sql`
-      UPDATE contrarian_truths
-      SET
-        thesis = COALESCE(${thesis || null}, thesis),
-        conviction_level = COALESCE(${conviction_level || null}, conviction_level),
-        status = COALESCE(${status || null}, status),
-        updated_at = NOW()
-      WHERE id = ${id}
-      RETURNING *
-    `
+    let truth
+    if (appendObservationId != null) {
+      // Append a single observation ID without overwriting the array
+      ;[truth] = await sql`
+        UPDATE contrarian_truths
+        SET
+          supporting_observations = array_append(supporting_observations, ${appendObservationId}),
+          updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `
+    } else {
+      ;[truth] = await sql`
+        UPDATE contrarian_truths
+        SET
+          thesis = COALESCE(${thesis || null}, thesis),
+          conviction_level = COALESCE(${conviction_level || null}, conviction_level),
+          status = COALESCE(${status || null}, status),
+          updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `
+    }
     return NextResponse.json(truth)
   } catch (error) {
     console.error('[truths] PATCH error:', error)

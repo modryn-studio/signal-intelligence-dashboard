@@ -6,6 +6,7 @@ import type { SignalInput } from '@/lib/types';
 import { SOURCE_CATEGORIES } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { AddInputModal } from '@/components/add-input-modal';
+import { AddObservationModal } from '@/components/add-observation-modal';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -39,7 +40,15 @@ const CATEGORY_STYLES: Record<Category, { dot: string; text: string; border: str
     },
   };
 
-function InputCard({ input, onDelete }: { input: SignalInput; onDelete: () => void }) {
+function InputCard({
+  input,
+  onDelete,
+  onObserve,
+}: {
+  input: SignalInput;
+  onDelete: () => void;
+  onObserve: () => void;
+}) {
   const cat = input.source_category as Category;
   const styles = CATEGORY_STYLES[cat] || CATEGORY_STYLES.trends;
   const [deleting, setDeleting] = useState(false);
@@ -106,6 +115,16 @@ function InputCard({ input, onDelete }: { input: SignalInput; onDelete: () => vo
               {input.notes}
             </p>
           )}
+
+          {/* Actions – shown on hover */}
+          <div className="mt-1.5 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+            <button
+              onClick={onObserve}
+              className="text-muted-foreground hover:text-foreground border-border hover:border-muted-foreground rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
+            >
+              &rarr; Observe
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -119,6 +138,13 @@ export function SignalFeed() {
   const [addCategory, setAddCategory] = useState<Category>('trends');
   const [agentStatus, setAgentStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [agentCount, setAgentCount] = useState(0);
+  const [observeModalOpen, setObserveModalOpen] = useState(false);
+  const [observePrefill, setObservePrefill] = useState<{ body: string; relatedInputIds: number[] } | undefined>(undefined);
+
+  const openObserveModal = (input: SignalInput) => {
+    setObservePrefill({ body: input.title, relatedInputIds: [input.id] });
+    setObserveModalOpen(true);
+  };
 
   const url =
     activeCategory === 'all'
@@ -306,12 +332,12 @@ export function SignalFeed() {
                     </button>
                   </div>
                   {grouped[cat].map((input) => (
-                    <InputCard key={input.id} input={input} onDelete={() => mutate()} />
+                    <InputCard key={input.id} input={input} onDelete={() => mutate()} onObserve={() => openObserveModal(input)} />
                   ))}
                 </div>
               ))
           : (inputs || []).map((input) => (
-              <InputCard key={input.id} input={input} onDelete={() => mutate()} />
+              <InputCard key={input.id} input={input} onDelete={() => mutate()} onObserve={() => openObserveModal(input)} />
             ))}
       </div>
 
@@ -320,6 +346,13 @@ export function SignalFeed() {
         onClose={() => setAddModalOpen(false)}
         onSaved={() => mutate()}
         defaultCategory={addCategory}
+      />
+
+      <AddObservationModal
+        open={observeModalOpen}
+        onClose={() => setObserveModalOpen(false)}
+        onSaved={() => mutate()}
+        prefill={observePrefill}
       />
     </div>
   );

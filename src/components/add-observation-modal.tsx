@@ -1,24 +1,41 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 
+interface Prefill {
+  body: string;
+  relatedInputIds: number[];
+}
+
 interface AddObservationModalProps {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
+  prefill?: Prefill;
 }
 
-export function AddObservationModal({ open, onClose, onSaved }: AddObservationModalProps) {
+export function AddObservationModal({ open, onClose, onSaved, prefill }: AddObservationModalProps) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [tags, setTags] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Reset state on open; pre-populate body from signal when available
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (open) {
+      setTitle('');
+      setBody(prefill?.body ?? '');
+      setTags('');
+      setError('');
+    }
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +52,7 @@ export function AddObservationModal({ open, onClose, onSaved }: AddObservationMo
         body: JSON.stringify({
           title: title.trim(),
           body: body.trim(),
+          related_input_ids: prefill?.relatedInputIds ?? [],
           tags: tags
             .split(',')
             .map((t) => t.trim())

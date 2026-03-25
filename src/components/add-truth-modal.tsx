@@ -10,9 +10,10 @@ interface AddTruthModalProps {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
+  prefillObservationId?: number;
 }
 
-export function AddTruthModal({ open, onClose, onSaved }: AddTruthModalProps) {
+export function AddTruthModal({ open, onClose, onSaved, prefillObservationId }: AddTruthModalProps) {
   const [thesis, setThesis] = useState('');
   const [conviction, setConviction] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -34,6 +35,9 @@ export function AddTruthModal({ open, onClose, onSaved }: AddTruthModalProps) {
           thesis: thesis.trim(),
           conviction_level: conviction,
           status: 'forming',
+          ...(prefillObservationId != null && {
+            supporting_observations: [prefillObservationId],
+          }),
         }),
       });
       if (!res.ok) throw new Error('Failed to save');

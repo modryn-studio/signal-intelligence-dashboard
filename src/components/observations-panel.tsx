@@ -5,10 +5,19 @@ import { useState } from 'react';
 import type { Observation } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { AddObservationModal } from '@/components/add-observation-modal';
+import { ObservationTruthPickerModal } from '@/components/observation-truth-picker-modal';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-function ObservationCard({ obs, onDelete }: { obs: Observation; onDelete: () => void }) {
+function ObservationCard({
+  obs,
+  onDelete,
+  onAddToThesis,
+}: {
+  obs: Observation;
+  onDelete: () => void;
+  onAddToThesis: (id: number) => void;
+}) {
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async () => {
@@ -36,6 +45,16 @@ function ObservationCard({ obs, onDelete }: { obs: Observation; onDelete: () => 
               </span>
             ))}
           </div>
+
+          {/* Actions – shown on hover */}
+          <div className="mt-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+            <button
+              onClick={() => onAddToThesis(obs.id)}
+              className="text-muted-foreground hover:text-foreground border-border hover:border-muted-foreground rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
+            >
+              &rarr; Add to thesis
+            </button>
+          </div>
         </div>
         <button
           onClick={handleDelete}
@@ -59,6 +78,13 @@ export function ObservationsPanel() {
     }
   );
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerObsId, setPickerObsId] = useState<number | null>(null);
+
+  const openPicker = (obsId: number) => {
+    setPickerObsId(obsId);
+    setPickerOpen(true);
+  };
 
   return (
     <div className="flex h-full flex-col gap-4">
@@ -113,13 +139,20 @@ export function ObservationsPanel() {
         )}
 
         {(observations || []).map((obs) => (
-          <ObservationCard key={obs.id} obs={obs} onDelete={() => mutate()} />
+          <ObservationCard key={obs.id} obs={obs} onDelete={() => mutate()} onAddToThesis={openPicker} />
         ))}
       </div>
 
       <AddObservationModal
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
+        onSaved={() => mutate()}
+      />
+
+      <ObservationTruthPickerModal
+        open={pickerOpen}
+        observationId={pickerObsId}
+        onClose={() => setPickerOpen(false)}
         onSaved={() => mutate()}
       />
     </div>
