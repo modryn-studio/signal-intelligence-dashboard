@@ -10,15 +10,15 @@ When you open the dashboard you see three columns side by side:
 - **Center — Observations.** Patterns you are starting to see.
 - **Right — Contrarian Truths.** Beliefs you are forming.
 
-At the top is the header. It shows today's date, a rotating focusing question, your stats, and a 14-day activity streak.
+At the top is the header. It shows today's date, today's focusing question, your stats, and a 14-day activity streak.
 
-Everything resets by day. Each day you start fresh.
+Your inputs, observations, and truths accumulate over time. The question and the Today counter change each day.
 
 ---
 
 ## Step 1 — Read the daily question
 
-At the top of the page, under "Signal Intelligence", there is a question in italics. It rotates every day. Examples:
+At the top of the page, under "Signal Intelligence", there is a question in italics. It is the same question all day — it changes once at midnight and cycles through 7 questions. Examples:
 
 - *"Where is something growing fast but being served poorly?"*
 - *"What do people keep complaining about that no one has fixed?"*
