@@ -115,8 +115,15 @@ async function fetchProductHunt(): Promise<FetchedItem[]> {
 
 async function fetchIndieHackers(): Promise<FetchedItem[]> {
   try {
-    // IH is SSR — post data is embedded in __NEXT_DATA__ on the page
-    const res = await fetch('https://www.indiehackers.com/posts?filter=top&period=week', {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + daysToMonday);
+    const weekStr = monday.toISOString().split('T')[0];
+    const ihUrl = `https://www.indiehackers.com/top/week-of-${weekStr}`;
+
+    const res = await fetch(ihUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; signal-intelligence-dashboard/1.0)',
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -126,28 +133,56 @@ async function fetchIndieHackers(): Promise<FetchedItem[]> {
     if (!res.ok) return [];
     const html = await res.text();
 
-    const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-    if (!match?.[1]) return [];
+    const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (nextDataMatch?.[1]) {
+      try {
+        const nextData = JSON.parse(nextDataMatch[1]) as Record<string, unknown>;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const pageProps = (nextData as any)?.props?.pageProps;
+        const posts: Array<Record<string, unknown>> =
+          pageProps?.posts ?? pageProps?.stories ?? pageProps?.feed ?? pageProps?.items ?? [];
+        if (posts.length > 0) {
+          return posts
+            .slice(0, 25)
+            .map((post, i) => ({
+              id: `ih_${(post.id as string) ?? (post.slug as string) ?? i}`,
+              title: (post.title as string) ?? (post.rawTitle as string) ?? '',
+              url:
+                (post.url as string) ??
+                `https://www.indiehackers.com/post/${post.slug as string}`,
+              source: 'Indie Hackers',
+              defaultCategory: 'indie' as SourceCategory,
+              score: (post.upvoteCount as number) ?? (post.score as number) ?? 0,
+            }))
+            .filter((item) => item.title);
+        }
+      } catch {
+        // fall through to HTML regex
+      }
+    }
 
-    const nextData = JSON.parse(match[1]) as Record<string, unknown>;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pageProps = (nextData as any)?.props?.pageProps;
-    const posts: Array<Record<string, unknown>> =
-      pageProps?.posts ?? pageProps?.stories ?? pageProps?.feed ?? [];
-
-    return posts
-      .slice(0, 25)
-      .map((post, i) => ({
-        id: `ih_${(post.id as string) ?? (post.slug as string) ?? i}`,
-        title: (post.title as string) ?? (post.rawTitle as string) ?? '',
-        url:
-          (post.url as string) ??
-          `https://www.indiehackers.com/post/${post.slug as string}`,
+    const postLinkRegex = new RegExp(
+      'href="(https://www\\\\.indiehackers\\\\.com/post/[^"?#]+)"[^>]*>([^<]{10,})</a>',
+      'g'
+    );
+    const items: FetchedItem[] = [];
+    const seen = new Set<string>();
+    let m: RegExpExecArray | null;
+    while ((m = postLinkRegex.exec(html)) !== null && items.length < 25) {
+      const [, postUrl, title] = m;
+      if (seen.has(postUrl)) continue;
+      seen.add(postUrl);
+      const slug = postUrl.split('/').pop() ?? String(items.length);
+      items.push({
+        id: `ih_${slug}`,
+        title: title.trim(),
+        url: postUrl,
         source: 'Indie Hackers',
         defaultCategory: 'indie' as SourceCategory,
-        score: (post.upvoteCount as number) ?? (post.score as number) ?? 0,
-      }))
-      .filter((item) => item.title);
+        score: 0,
+      });
+    }
+    return items;
   } catch {
     return [];
   }
