@@ -58,9 +58,15 @@ This is always your first action. You need inputs before you can have observatio
 
 ---
 
-## Step 3 — Browse your signal sources
+## Step 3 — Browse your signal sources (or run the agent)
 
-Below the category filter tabs in the left column, there are six quick-access links:
+You have two options:
+
+**Option A — Let the agent do it.** Click **Run Agent** next to the “+ Log Input” button. It fetches recent top posts from Hacker News, r/SaaS, and r/Entrepreneur, filters them against today’s focusing question using Claude, and logs the most relevant ones automatically. Items logged this way are tagged `agent` so you can identify them.
+
+It takes 15–30 seconds. When it’s done, the button shows how many signals were logged. The feed refreshes automatically.
+
+**Option B — Browse manually.** Below the category filter tabs in the left column, there are six quick-access links:
 
 - Hacker News
 - Product Hunt
@@ -215,6 +221,7 @@ Do this every day for two weeks. Patterns emerge that you cannot see by reading 
 | Feature                                 | Status                                                         |
 | --------------------------------------- | -------------------------------------------------------------- |
 | Logging signal inputs                   | ✅ Working                                                     |
+| Run Agent (HN + Reddit → Claude)        | ✅ Working — requires ANTHROPIC_API_KEY in env                |
 | Filtering by category                   | ✅ Working                                                     |
 | Logging observations                    | ✅ Working                                                     |
 | Forming and advancing contrarian truths | ✅ Working                                                     |

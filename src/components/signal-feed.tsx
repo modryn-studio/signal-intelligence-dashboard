@@ -117,6 +117,8 @@ export function SignalFeed() {
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addCategory, setAddCategory] = useState<Category>('trends');
+  const [agentStatus, setAgentStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+  const [agentCount, setAgentCount] = useState(0);
 
   const url =
     activeCategory === 'all'
@@ -128,6 +130,22 @@ export function SignalFeed() {
   const openAdd = (cat?: Category) => {
     setAddCategory(cat || 'trends');
     setAddModalOpen(true);
+  };
+
+  const runAgent = async () => {
+    setAgentStatus('loading');
+    try {
+      const res = await fetch('/api/agent/run', { method: 'POST' });
+      if (!res.ok) throw new Error('Failed');
+      const data = (await res.json()) as { logged: number };
+      setAgentCount(data.logged);
+      setAgentStatus('done');
+      mutate();
+      setTimeout(() => setAgentStatus('idle'), 3000);
+    } catch {
+      setAgentStatus('error');
+      setTimeout(() => setAgentStatus('idle'), 3000);
+    }
   };
 
   const grouped = (inputs || []).reduce(
@@ -154,13 +172,29 @@ export function SignalFeed() {
             {inputs?.length || 0} captured today
           </p>
         </div>
-        <Button
-          onClick={() => openAdd()}
-          size="sm"
-          className="bg-primary text-primary-foreground h-7 px-3 font-mono text-xs tracking-wider"
-        >
-          + Log Input
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={runAgent}
+            disabled={agentStatus === 'loading'}
+            size="sm"
+            className="border-border text-muted-foreground hover:text-foreground h-7 border bg-transparent px-3 font-mono text-xs tracking-wider disabled:opacity-40"
+          >
+            {agentStatus === 'loading'
+              ? 'Scanning...'
+              : agentStatus === 'done'
+                ? `${agentCount} logged`
+                : agentStatus === 'error'
+                  ? 'Failed'
+                  : 'Run Agent'}
+          </Button>
+          <Button
+            onClick={() => openAdd()}
+            size="sm"
+            className="bg-primary text-primary-foreground h-7 px-3 font-mono text-xs tracking-wider"
+          >
+            + Log Input
+          </Button>
+        </div>
       </div>
 
       {/* Category filter tabs */}

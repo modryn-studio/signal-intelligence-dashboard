@@ -83,6 +83,7 @@ A solo developer who knows how to build but doesn't yet know what to build. Disc
 - Daily prompt: "Where is something growing fast but being served poorly?"
 - Weekly digest: "What you spotted. What it means. What you'd bet on."
 - Empty state: "Nothing here yet. Drop a signal."
+- Footer: "Built by Luke. For the 0.1% who consume signal, not noise."
 - Error: "Something went wrong. Refresh and try again."
 
 ## README Standard

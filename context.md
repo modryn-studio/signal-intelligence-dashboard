@@ -35,6 +35,7 @@ Current: email-only — no payment gate.
 - swr — client-side data fetching for dashboard panels
 - recharts — charts for stats panel
 - @vercel/analytics — pageview tracking (already in layout)
+- @anthropic-ai/sdk — Anthropic Claude (claude-sonnet-4-6) for agent-based signal gathering
 
 ## Project Structure Additions
 
