@@ -23,6 +23,7 @@ basePath: (empty — standalone deployment)
 - Vercel Analytics `<Analytics />` in `layout.tsx` — zero-config pageview tracking, no env vars needed
 - `@/lib/analytics.ts` — no-op stub with named methods; wire in a real provider here if needed
 - `@neondatabase/serverless` — Neon Postgres via tagged SQL template literals (`sql` tag)
+- `@anthropic-ai/sdk` — Anthropic Claude (`claude-sonnet-4-6`) for agent-based signal gathering
 - `swr` — client-side data fetching for dashboard panels (refresh every 60s)
 - `recharts` — charts for stats panel
 - `next-themes` — light/dark mode toggle (defaults to system preference)
@@ -42,12 +43,12 @@ schema.sql              → one-time Neon DB bootstrap (already run)
 
 - `/` → Main dashboard — 3-column layout: signal feed, observations, contrarian truths
 - `/api/inputs` → CRUD for signal inputs (URLs, articles, snippets)
-- `/api/observations` → CRUD for observations with tags
-- `/api/truths` → CRUD for truths / theses
-- `/api/contrarian-truths` → CRUD for contrarian truth entries
+- `/api/observations` → CRUD for observations with tags; stores `related_input_ids INT[]` linking back to signal inputs
+- `/api/truths` → CRUD for contrarian truths — thesis, conviction level (1–5), status lifecycle (forming → confident → validated → invalidated), `supporting_observations INT[]`
 - `/api/stats` → Aggregate stats for dashboard header streak display
 - `/api/digest` → Weekly digest generation — email-ready summary
 - `/api/feedback` → Feedback submissions + newsletter signup
+- `/api/agent/run` → POST — fetches HN, Product Hunt, Indie Hackers, r/SaaS, r/Entrepreneur; filters via Claude; inserts to signal_inputs tagged `agent`
 
 ## Brand & Voice
 

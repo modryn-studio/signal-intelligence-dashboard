@@ -139,7 +139,9 @@ export function SignalFeed() {
   const [agentStatus, setAgentStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [agentCount, setAgentCount] = useState(0);
   const [observeModalOpen, setObserveModalOpen] = useState(false);
-  const [observePrefill, setObservePrefill] = useState<{ body: string; relatedInputIds: number[] } | undefined>(undefined);
+  const [observePrefill, setObservePrefill] = useState<
+    { body: string; relatedInputIds: number[] } | undefined
+  >(undefined);
 
   const openObserveModal = (input: SignalInput) => {
     setObservePrefill({ body: input.title, relatedInputIds: [input.id] });
@@ -332,12 +334,22 @@ export function SignalFeed() {
                     </button>
                   </div>
                   {grouped[cat].map((input) => (
-                    <InputCard key={input.id} input={input} onDelete={() => mutate()} onObserve={() => openObserveModal(input)} />
+                    <InputCard
+                      key={input.id}
+                      input={input}
+                      onDelete={() => mutate()}
+                      onObserve={() => openObserveModal(input)}
+                    />
                   ))}
                 </div>
               ))
           : (inputs || []).map((input) => (
-              <InputCard key={input.id} input={input} onDelete={() => mutate()} onObserve={() => openObserveModal(input)} />
+              <InputCard
+                key={input.id}
+                input={input}
+                onDelete={() => mutate()}
+                onObserve={() => openObserveModal(input)}
+              />
             ))}
       </div>
 

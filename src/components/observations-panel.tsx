@@ -139,7 +139,12 @@ export function ObservationsPanel() {
         )}
 
         {(observations || []).map((obs) => (
-          <ObservationCard key={obs.id} obs={obs} onDelete={() => mutate()} onAddToThesis={openPicker} />
+          <ObservationCard
+            key={obs.id}
+            obs={obs}
+            onDelete={() => mutate()}
+            onAddToThesis={openPicker}
+          />
         ))}
       </div>
 

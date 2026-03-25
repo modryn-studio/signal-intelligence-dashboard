@@ -13,7 +13,12 @@ interface AddTruthModalProps {
   prefillObservationId?: number;
 }
 
-export function AddTruthModal({ open, onClose, onSaved, prefillObservationId }: AddTruthModalProps) {
+export function AddTruthModal({
+  open,
+  onClose,
+  onSaved,
+  prefillObservationId,
+}: AddTruthModalProps) {
   const [thesis, setThesis] = useState('');
   const [conviction, setConviction] = useState(1);
   const [saving, setSaving] = useState(false);
