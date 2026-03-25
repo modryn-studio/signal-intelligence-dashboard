@@ -63,6 +63,56 @@ async function fetchHN(): Promise<FetchedItem[]> {
   }
 }
 
+async function fetchProductHunt(): Promise<FetchedItem[]> {
+  const token = process.env.PRODUCT_HUNT_TOKEN;
+  if (!token) return [];
+  try {
+    const res = await fetch('https://api.producthunt.com/v2/api/graphql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        query: `{
+          posts(first: 20, order: VOTES) {
+            edges {
+              node {
+                id
+                name
+                tagline
+                url
+                votesCount
+              }
+            }
+          }
+        }`,
+      }),
+      cache: 'no-store',
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      data: {
+        posts: {
+          edges: Array<{
+            node: { id: string; name: string; tagline: string; url: string; votesCount: number };
+          }>;
+        };
+      };
+    };
+    return data.data.posts.edges.map(({ node }) => ({
+      id: `ph_${node.id}`,
+      title: `${node.name} — ${node.tagline}`,
+      url: node.url,
+      source: 'Product Hunt',
+      defaultCategory: 'indie' as SourceCategory,
+      score: node.votesCount,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 async function fetchReddit(subreddit: string): Promise<FetchedItem[]> {
   try {
     const res = await fetch(
@@ -97,17 +147,19 @@ export async function POST(_req: Request): Promise<Response> {
     const question = getTodayQuestion();
     log.info(ctx.reqId, 'Fetching sources', { question });
 
-    const [hn, redditSaas, redditEnt] = await Promise.all([
+    const [hn, redditSaas, redditEnt, productHunt] = await Promise.all([
       fetchHN(),
       fetchReddit('SaaS'),
       fetchReddit('Entrepreneur'),
+      fetchProductHunt(),
     ]);
 
-    const allItems: FetchedItem[] = [...hn, ...redditSaas, ...redditEnt];
+    const allItems: FetchedItem[] = [...hn, ...redditSaas, ...redditEnt, ...productHunt];
     log.info(ctx.reqId, 'Fetched', {
       hn: hn.length,
       redditSaas: redditSaas.length,
       redditEnt: redditEnt.length,
+      productHunt: productHunt.length,
       total: allItems.length,
     });
 
@@ -126,7 +178,7 @@ export async function POST(_req: Request): Promise<Response> {
 
       const prompt = `Today's focusing question: "${question}"
 
-Below are ${allItems.length} recent posts from Hacker News, r/SaaS, and r/Entrepreneur. Select the 8 to 12 most relevant to the focusing question. For each, assign source_category (trends, complaints, indie, or data — judge by content, not by source) and write a one-line note explaining what the signal is and why it matters to someone looking for underserved markets.
+Below are ${allItems.length} recent posts from Hacker News, Product Hunt, r/SaaS, and r/Entrepreneur. Select the 8 to 12 most relevant to the focusing question. For each, assign source_category (trends, complaints, indie, or data — judge by content, not by source) and write a one-line note explaining what the signal is and why it matters to someone looking for underserved markets.
 
 Items:
 ${JSON.stringify(itemsForPrompt, null, 2)}
