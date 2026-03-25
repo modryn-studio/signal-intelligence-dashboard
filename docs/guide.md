@@ -20,9 +20,9 @@ Your inputs, observations, and truths accumulate over time. The question and the
 
 At the top of the page, under "Signal Intelligence", there is a question in italics. It is the same question all day — it changes once at midnight and cycles through 7 questions. Examples:
 
-- *"Where is something growing fast but being served poorly?"*
-- *"What do people keep complaining about that no one has fixed?"*
-- *"What belief do most people in this space hold that is wrong?"*
+- _"Where is something growing fast but being served poorly?"_
+- _"What do people keep complaining about that no one has fixed?"_
+- _"What belief do most people in this space hold that is wrong?"_
 
 Hold this question in mind while you browse. That is the whole point of the tool.
 
@@ -36,22 +36,21 @@ This is always your first action. You need inputs before you can have observatio
 
 1. In the left column, click **+ Log Input**
 2. A form opens. Fill it in:
-
    - **Category** — pick one of four tabs at the top of the form:
      - `Trends` — something growing or emerging
-     - `Complaints` — something broken that people are stuck with
+     - `Pain` — something broken that people are stuck with
      - `Indie` — an opportunity someone already found
-     - `Data` — a search trend or usage number
+     - `Raw` — a search trend or usage number
 
    - **Source** — click one of the source pills that appear below the category. These are pre-filled based on the category you picked. You can pick whichever matches where you found it.
 
-   - **What did you find?** *(required)* — one sentence. What is the signal. Keep it short.
+   - **What did you find?** _(required)_ — one sentence. What is the signal. Keep it short.
 
-   - **URL** *(optional)* — paste the link if you have one. The title in the feed becomes a clickable link.
+   - **URL** _(optional)_ — paste the link if you have one. The title in the feed becomes a clickable link.
 
-   - **Notes — what matters here?** *(optional)* — this is the most important optional field. Write why this caught your attention before you lose the instinct. One or two sentences.
+   - **Notes — what matters here?** _(optional)_ — this is the most important optional field. Write why this caught your attention before you lose the instinct. One or two sentences.
 
-   - **Tags** *(optional)* — comma-separated labels. e.g. `fintech, onboarding, b2b`. Use the same tags across inputs and observations to connect them later.
+   - **Tags** _(optional)_ — comma-separated labels. e.g. `fintech, onboarding, b2b`. Use the same tags across inputs and observations to connect them later.
 
 3. Click **Log Input**. It saves and appears in the left column immediately.
 
@@ -81,7 +80,7 @@ Click any of them to open that site in a new tab. Browse with the daily question
 Once you have logged a few inputs, you can filter by category using the tabs below the "Signal Inputs" header:
 
 - **All** — shows everything, grouped by category
-- **Trends / Complaints / Indie / Data** — shows only that category
+- **Trends / Pain / Indie / Raw** — shows only that category
 
 The feed always shows today's inputs only.
 
@@ -97,12 +96,11 @@ An observation is a pattern, not a note. Write one when you look at several inpu
 
 1. In the center column, click **+ Capture** (or the add button at the top of the observations panel)
 2. A form opens:
+   - **Pattern or insight** _(required)_ — the pattern in one sentence. e.g. _"B2B onboarding is consistently the most complained-about part of every SaaS product"_
 
-   - **Pattern or insight** *(required)* — the pattern in one sentence. e.g. *"B2B onboarding is consistently the most complained-about part of every SaaS product"*
+   - **Details** _(required)_ — connect the dots. What have you seen repeatedly? Where is the gap? Two to five sentences. No polish needed.
 
-   - **Details** *(required)* — connect the dots. What have you seen repeatedly? Where is the gap? Two to five sentences. No polish needed.
-
-   - **Tags** *(optional)* — use the same tags you put on the inputs that sparked this.
+   - **Tags** _(optional)_ — use the same tags you put on the inputs that sparked this.
 
 3. Click **Save Observation**
 
@@ -120,8 +118,7 @@ You do not form one until you have enough observations to back it up.
 
 1. In the right column, click **+ Add Truth**
 2. A form opens:
-
-   - **Your thesis** *(required)* — write the belief in one or two sentences. Be specific. Be bold. e.g. *"Most B2B SaaS companies will lose to vertical AI agents that handle the full workflow, not just the UI."*
+   - **Your thesis** _(required)_ — write the belief in one or two sentences. Be specific. Be bold. e.g. _"Most B2B SaaS companies will lose to vertical AI agents that handle the full workflow, not just the UI."_
 
    - **Conviction level** — click one of the five buttons:
      - **1 — Hunch** — you feel something but cannot prove it
@@ -139,6 +136,7 @@ You do not form one until you have enough observations to back it up.
 Every truth starts as `forming`. As evidence builds, you advance it.
 
 **Each truth card shows:**
+
 - The thesis in quotes
 - Status badge (Forming / Confident / Validated / Invalidated)
 - Conviction label and number
@@ -164,6 +162,7 @@ The header shows three numbers at all times:
 - **Theses** — total contrarian truths ever
 
 The 14 small squares in the top right are your 14-day streak. Each square is one day:
+
 - Dark green = 5+ inputs that day
 - Medium green = 2–4 inputs
 - Faint green = 1 input
@@ -213,16 +212,16 @@ Do this every day for two weeks. Patterns emerge that you cannot see by reading 
 
 ## What is not working yet
 
-| Feature | Status |
-|---|---|
-| Logging signal inputs | ✅ Working |
-| Filtering by category | ✅ Working |
-| Logging observations | ✅ Working |
-| Forming and advancing contrarian truths | ✅ Working |
-| Stats and streak | ✅ Working |
-| Digest preview (counts) | ✅ Working |
-| Digest email delivery | ⏳ Not wired — email provider (Resend) not yet connected |
-| URL metadata auto-fill | ⏳ Not built — paste URL manually and write the title yourself |
+| Feature                                 | Status                                                         |
+| --------------------------------------- | -------------------------------------------------------------- |
+| Logging signal inputs                   | ✅ Working                                                     |
+| Filtering by category                   | ✅ Working                                                     |
+| Logging observations                    | ✅ Working                                                     |
+| Forming and advancing contrarian truths | ✅ Working                                                     |
+| Stats and streak                        | ✅ Working                                                     |
+| Digest preview (counts)                 | ✅ Working                                                     |
+| Digest email delivery                   | ⏳ Not wired — email provider (Resend) not yet connected       |
+| URL metadata auto-fill                  | ⏳ Not built — paste URL manually and write the title yourself |
 
 ---
 
