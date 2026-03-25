@@ -10,20 +10,33 @@ Run the asset generator to produce all favicons, icons, OG image, and README ban
 
 ## Steps
 
-1. Check that `public/brand/logomark.png` exists. If it doesn't, stop and tell the user:
+1. Delete any v0/Vercel placeholder files from `public/` if they exist:
+   ```powershell
+   $placeholders = @(
+     'public/placeholder.jpg', 'public/placeholder.svg',
+     'public/placeholder-logo.png', 'public/placeholder-logo.svg',
+     'public/placeholder-user.jpg',
+     'public/apple-icon.png',
+     'public/icon.svg', 'public/icon-dark-32x32.png', 'public/icon-light-32x32.png'
+   )
+   $placeholders | Where-Object { Test-Path $_ } | ForEach-Object { Remove-Item $_ }
+   ```
+   Report how many were removed (or "none found" if clean).
+
+2. Check that `public/brand/logomark.png` exists. If it doesn't, stop and tell the user:
    > "Drop your logomark at `public/brand/logomark.png` (1024×1024, transparent background) and re-run `/assets`."
 
 2. Check that ImageMagick is installed by running `magick --version`. If it's not found, stop and tell the user:
    > "ImageMagick is required. Install it from https://imagemagick.org then re-run `/assets`."
 
-3. Run the asset generator:
+4. Run the asset generator:
    ```powershell
    .\scripts\generate-assets.ps1
    ```
 
-4. If the script succeeds, report which files were generated.
+5. If the script succeeds, report which files were generated.
 
-5. Write `README.md` — overwrite the entire file with the project README following the `## README Standard` format from `.github/copilot-instructions.md`:
+6. Write `README.md` — overwrite the entire file with the project README following the `## README Standard` format from `.github/copilot-instructions.md`:
    - Banner image line: `![{site.name}](public/brand/banner.png)`
    - H1: product name only
    - Tagline: one sentence — what the user gets, outcome-focused, no buzzwords
@@ -32,7 +45,7 @@ Run the asset generator to produce all favicons, icons, OG image, and README ban
    - Stack line: read `package.json` dependencies for the core tech list
    - Nothing else
 
-6. Commit the generated assets and README:
+7. Commit the generated assets and README:
    ```powershell
    git add public/ src/app/apple-icon.png README.md
    git commit -m "assets: generate favicons, icons, banner, and README"
