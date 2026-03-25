@@ -12,15 +12,15 @@ export const site = {
   ogTitle: 'Signal Intelligence — Capture Signals, Form Contrarian Truths',
   ogDescription:
     'A personal system for consuming market signal, capturing observations, and forming contrarian truths. Built for solo analysts who think for themselves.',
-  cta: 'Start capturing signal',
+  cta: 'Start observing →',
   founder: 'Luke Hanner',
   email: 'hello@modrynstudio.com',
   // Waitlist section copy — shown in the EmailSignup component.
   waitlist: {
-    headline: 'Get the weekly signal digest',
+    headline: 'What you spotted. What it means.',
     subheadline:
-      'Curated observations and contrarian truths, delivered weekly. No noise, only signal.',
-    success: "You're in. Watch for the first digest.",
+      'Observations and contrarian theses, delivered weekly. Train yourself to see what others miss.',
+    success: "You're in. First digest hits your inbox soon.",
   },
   // Brand colors — used in manifest theme_color / background_color
   accent: '#4ade80',  // green — primary action color

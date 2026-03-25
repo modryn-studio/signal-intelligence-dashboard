@@ -1,23 +1,23 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import { JetBrains_Mono } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
-import { Toaster } from '@/components/ui/sonner'
-import { SiteSchema } from '@/components/site-schema'
-import FeedbackWidget from '@/components/feedback-widget'
-import { ThemeProvider } from '@/components/theme-provider'
-import { site } from '@/config/site'
-import './globals.css'
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import { JetBrains_Mono } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
+import { Toaster } from '@/components/ui/sonner';
+import { SiteSchema } from '@/components/site-schema';
+import FeedbackWidget from '@/components/feedback-widget';
+import { ThemeProvider } from '@/components/theme-provider';
+import { site } from '@/config/site';
+import './globals.css';
 
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
-})
+});
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
   variable: '--font-jetbrains-mono',
-})
+});
 
 export const metadata: Metadata = {
   title: site.ogTitle,
@@ -35,12 +35,12 @@ export const metadata: Metadata = {
     description: site.ogDescription,
     creator: site.social.twitterHandle,
   },
-}
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -54,5 +54,5 @@ export default function RootLayout({
         </ThemeProvider>
       </body>
     </html>
-  )
+  );
 }

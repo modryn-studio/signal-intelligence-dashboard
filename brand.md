@@ -30,25 +30,25 @@ A solo developer who knows how to build but doesn’t yet know what to build. Th
 
 **Dark mode** (default at night):
 
-| Name       | Value                     | Role                                          |
-|------------|---------------------------|-----------------------------------------------|
-| Accent     | oklch(0.75 0.18 142)      | Primary — green signal color, CTAs, key UI    |
-| Secondary  | oklch(0.72 0.19 27)       | Orange-red — warnings, contrarian markers     |
-| Background | oklch(0.10 0 0)           | Page background — near black                  |
-| Text       | oklch(0.92 0 0)           | Body text — near white                        |
-| Muted      | oklch(0.65 0 0)           | Secondary text, borders, placeholders         |
-| Border     | oklch(0.26 0 0)           | Dividers, input outlines                      |
+| Name       | Value                | Role                                       |
+| ---------- | -------------------- | ------------------------------------------ |
+| Accent     | oklch(0.75 0.18 142) | Primary — green signal color, CTAs, key UI |
+| Secondary  | oklch(0.72 0.19 27)  | Orange-red — warnings, contrarian markers  |
+| Background | oklch(0.10 0 0)      | Page background — near black               |
+| Text       | oklch(0.92 0 0)      | Body text — near white                     |
+| Muted      | oklch(0.65 0 0)      | Secondary text, borders, placeholders      |
+| Border     | oklch(0.26 0 0)      | Dividers, input outlines                   |
 
 **Light mode** (readable in bright daylight):
 
-| Name       | Value                     | Role                                          |
-|------------|---------------------------|-----------------------------------------------|
-| Accent     | oklch(0.52 0.18 142)      | Primary — darker green for light bg contrast  |
-| Secondary  | oklch(0.55 0.22 27)       | Orange-red — warnings, contrarian markers     |
-| Background | oklch(0.98 0 0)           | Page background — near white                  |
-| Text       | oklch(0.12 0 0)           | Body text — near black                        |
-| Muted      | oklch(0.42 0 0)           | Secondary text, placeholders                  |
-| Border     | oklch(0.86 0 0)           | Dividers, input outlines                      |
+| Name       | Value                | Role                                         |
+| ---------- | -------------------- | -------------------------------------------- |
+| Accent     | oklch(0.52 0.18 142) | Primary — darker green for light bg contrast |
+| Secondary  | oklch(0.55 0.22 27)  | Orange-red — warnings, contrarian markers    |
+| Background | oklch(0.98 0 0)      | Page background — near white                 |
+| Text       | oklch(0.12 0 0)      | Body text — near black                       |
+| Muted      | oklch(0.42 0 0)      | Secondary text, placeholders                 |
+| Border     | oklch(0.86 0 0)      | Dividers, input outlines                     |
 
 Color rules:
 

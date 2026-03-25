@@ -1,8 +1,8 @@
-# [Project Name] — Copilot Context
+# Signal Intelligence — Copilot Context
 
 ## Who I Am
 
-<!-- TODO: describe yourself, your product, and your target user -->
+Luke Hanner is a solo developer shipping AI-assisted tools for indie founders. Signal Intelligence is a personal daily dashboard for observing market signals, capturing insights, and forming contrarian theses over time. Built for solo developers who already know how to build — but are still figuring out what to build. The dashboard aggregates signal sources, prompts a single focusing question each day, and lets patterns surface through an observation log and contrarian truths tracker. Weekly email digest output.
 
 ## Deployment
 
@@ -11,9 +11,9 @@
      If mode is modryn-app:         basePath must stay set in next.config.ts.
      If mode is standalone-*:       basePath must be absent from next.config.ts. -->
 
-mode: <!-- modryn-app | standalone-subdomain | standalone-domain -->
-url: <!-- canonical URL -->
-basePath: <!-- /tools/your-slug   (empty for standalone modes) -->
+mode: standalone-domain
+url: https://v0-signal-intelligence-dashboard.vercel.app
+basePath: (empty — standalone deployment)
 
 ## Stack
 
@@ -22,34 +22,64 @@ basePath: <!-- /tools/your-slug   (empty for standalone modes) -->
 - Vercel for deployment
 - Vercel Analytics `<Analytics />` in `layout.tsx` — zero-config pageview tracking, no env vars needed
 - `@/lib/analytics.ts` — no-op stub with named methods; wire in a real provider here if needed
-<!-- TODO: add project-specific services (e.g. Resend, Stripe, Prisma, Supabase) -->
+- `@neondatabase/serverless` — Neon Postgres via tagged SQL template literals (`sql` tag)
+- `swr` — client-side data fetching for dashboard panels (refresh every 60s)
+- `recharts` — charts for stats panel
+- `next-themes` — light/dark mode toggle (defaults to system preference)
 
 ## Project Structure
 
 ```
-/app                    → Next.js App Router pages
-/components             → Reusable UI components
-/lib                    → Utilities, helpers, data fetching
-<!-- TODO: add any project-specific directories -->
+/app                    → Next.js App Router pages + 7 API routes
+/components             → Dashboard panels, modals, and shadcn/ui primitives
+/lib                    → db.ts (Neon), types.ts, route-logger.ts, analytics.ts, utils.ts
+/hooks                  → use-mobile.ts, use-toast.ts
+/config                 → site.ts — single source of truth for site metadata
+schema.sql              → one-time Neon DB bootstrap (already run)
 ```
 
 ## Route Map
 
-<!-- TODO: list every route and what it does -->
-
-- `/` → (home)
-- `/privacy` → Privacy policy
-- `/terms` → Terms of service
+- `/` → Main dashboard — 3-column layout: signal feed, observations, contrarian truths
+- `/api/inputs` → CRUD for signal inputs (URLs, articles, snippets)
+- `/api/observations` → CRUD for observations with tags
+- `/api/truths` → CRUD for truths / theses
+- `/api/contrarian-truths` → CRUD for contrarian truth entries
+- `/api/stats` → Aggregate stats for dashboard header streak display
+- `/api/digest` → Weekly digest generation — email-ready summary
+- `/api/feedback` → Feedback submissions + newsletter signup
 
 ## Brand & Voice
 
-<!-- TODO: populate from brand.md
-  Voice rules: how the product sounds (tone, banned words, sentence style)
-  Target User: 2–3 sentence portrait of who is using this and why
-  Visual Rules: colors (all 5 with roles), fonts, motion, things to avoid
-  Emotional Arc: what the user feels at each stage — land, use, convert, share
-  Copy Reference: real examples of hero, CTA, error, waiting state copy
--->
+**Voice rules:**
+- Short sentences. Direct. No setup. Every word earns its place.
+- Confident without being arrogant. This tool knows what it is.
+- Honest about what doesn't exist yet. No fake polish on unfinished things.
+- Never use: "powerful, seamless, revolutionary, unlock, supercharge, next-level, game-changing, robust"
+
+**Target User:**
+A solo developer who knows how to build but doesn't yet know what to build. Disciplined, impatient with noise, optimizing for freedom over growth. They want a system that trains them to see — not another dashboard that dumps data on them.
+
+**Visual Rules:**
+- Light and dark mode. Defaults to system preference. Theme toggle in the dashboard header.
+- Fonts: Space Grotesk (headlines) + Space Mono (badges, tags, code, timestamps). Currently Inter + JetBrains Mono — migration pending.
+- Motion: Minimal. Subtle fade on load. Nothing moves unless it has to.
+- Avoid: no gradients, no blue of any shade, no decorative illustrations, no stock photos.
+- Accent green (`oklch(0.75 0.18 142)` dark / `oklch(0.52 0.18 142)` light) is the single identity color.
+
+**Emotional Arc:**
+- Land: "This is exactly what I needed and didn't know existed."
+- Read: "This person thinks the way I think."
+- Scroll: "I want to use this today."
+- Convert: "I'm building this into my daily routine."
+
+**Copy Reference:**
+- Hero: "Train yourself to see what others miss."
+- CTA: "Start observing."
+- Daily prompt: "Where is something growing fast but being served poorly?"
+- Weekly digest: "What you spotted. What it means. What you'd bet on."
+- Empty state: "Nothing here yet. Drop a signal."
+- Error: "Something went wrong. Refresh and try again."
 
 ## README Standard
 
@@ -92,24 +122,26 @@ This project uses Tailwind CSS v4. The rules are different from v3 — follow th
 
 **Design tokens live in `@theme`, not `:root`:**
 
-<!-- TODO: update the @theme example below with the actual brand colors from globals.css -->
+<!-- Note: this project uses OKLCH color format and dual light/dark mode.
+     :root = light mode tokens, .dark = dark mode tokens (see globals.css).
+     The @theme block below bridges to the boilerplate token aliases. -->
 
 ```css
 /* ✅ correct — generates text-accent, bg-surface, border-border, etc. */
 @theme {
-  --color-accent: #f97415; /* TODO: replace with brand accent color */
-  --color-secondary: #ffdd00; /* TODO: replace with brand secondary color */
-  --color-bg: #050505; /* TODO: replace with brand background color */
-  --color-text: #e5e5e5; /* TODO: replace with brand text color */
-  --color-muted: #666666; /* TODO: replace with brand muted color */
-  --color-surface: #111111; /* TODO: replace with brand surface color */
-  --color-border: #222222; /* TODO: replace with brand border color */
-  --font-heading: var(--font-sans); /* TODO: replace with brand heading font */
+  --color-accent: oklch(0.75 0.18 142); /* green signal color — dark mode primary */
+  --color-secondary: oklch(0.72 0.19 27); /* orange-red — warnings, contrarian markers */
+  --color-bg: oklch(0.10 0 0); /* near-black page background (dark) */
+  --color-text: oklch(0.92 0 0); /* near-white body text (dark) */
+  --color-muted: oklch(0.65 0 0); /* secondary text, placeholders */
+  --color-surface: oklch(0.14 0 0); /* card/panel surface (dark) */
+  --color-border: oklch(0.26 0 0); /* dividers, input outlines (dark) */
+  --font-heading: var(--font-sans); /* Inter — Space Grotesk migration pending */
 }
 
 /* ❌ wrong — :root creates CSS variables but NO utility classes */
 :root {
-  --color-accent: #f97415;
+  --color-accent: oklch(0.75 0.18 142);
 }
 ```
 
