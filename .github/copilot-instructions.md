@@ -12,7 +12,7 @@ Luke Hanner is a solo developer shipping AI-assisted tools for indie founders. S
      If mode is standalone-*:       basePath must be absent from next.config.ts. -->
 
 mode: standalone-domain
-url: https://v0-signal-intelligence-dashboard.vercel.app
+url: https://www.modrynstudio.com/tools/signal-intelligence
 basePath: (empty — standalone deployment)
 
 ## Stack

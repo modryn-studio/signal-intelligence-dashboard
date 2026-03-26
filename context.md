@@ -19,7 +19,7 @@ A solo developer who wants to build a lifestyle business but doesn't know where 
 ## Deployment
 
 mode: standalone-domain
-url: https://v0-signal-intelligence-dashboard.vercel.app
+url: https://www.modrynstudio.com/tools/signal-intelligence
 basePath: (empty — standalone deployment)
 
 modrynstudio.com has a verified Domain property in Google Search Console.

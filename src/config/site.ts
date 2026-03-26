@@ -3,7 +3,7 @@
 export const site = {
   name: 'Signal Intelligence',
   shortName: 'Signal',
-  url: 'https://v0-signal-intelligence-dashboard.vercel.app', // TODO: update to custom domain if added
+  url: 'https://www.modrynstudio.com/tools/signal-intelligence',
   // Base description — used in <meta description>, manifest, JSON-LD
   description:
     'A personal system for tracking market signals, capturing observations, and forming contrarian theses. Built for solo builders who want to see what others miss.',

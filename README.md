@@ -4,7 +4,7 @@
 
 Train yourself to see what others miss.
 
-→ [v0-signal-intelligence-dashboard.vercel.app](https://v0-signal-intelligence-dashboard.vercel.app)
+→ [modrynstudio.com/tools/signal-intelligence](https://www.modrynstudio.com/tools/signal-intelligence)
 
 ---
 
