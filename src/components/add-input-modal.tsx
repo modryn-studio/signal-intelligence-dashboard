@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,6 +33,14 @@ export function AddInputModal({ open, onClose, onSaved, defaultCategory = 'trend
   const [tags, setTags] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // Sync category when the modal opens with a different defaultCategory
+  useEffect(() => {
+    if (open) {
+      setCategory(defaultCategory)
+      setSource(SOURCE_CATEGORIES[defaultCategory].sources[0])
+    }
+  }, [open, defaultCategory])
 
   const handleCategoryChange = (cat: Category) => {
     setCategory(cat)
