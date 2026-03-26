@@ -6,6 +6,17 @@ import type { Observation } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { AddObservationModal } from '@/components/add-observation-modal';
 import { ObservationTruthPickerModal } from '@/components/observation-truth-picker-modal';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -27,6 +38,7 @@ function ObservationCard({
   };
 
   return (
+    <AlertDialog>
     <div className="group border-primary/50 hover:border-primary relative border-l-2 py-2 pl-3 transition-colors">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
@@ -56,16 +68,32 @@ function ObservationCard({
             </button>
           </div>
         </div>
-        <button
-          onClick={handleDelete}
-          disabled={deleting}
-          className="text-muted-foreground hover:text-destructive-foreground mt-0.5 shrink-0 text-xs opacity-0 transition-all group-hover:opacity-100"
-          aria-label="Delete observation"
-        >
-          ✕
-        </button>
+        <AlertDialogTrigger asChild>
+          <button
+            disabled={deleting}
+            className="text-muted-foreground hover:text-destructive-foreground mt-0.5 shrink-0 text-xs opacity-0 transition-all group-hover:opacity-100"
+            aria-label="Delete observation"
+          >
+            ✕
+          </button>
+        </AlertDialogTrigger>
       </div>
     </div>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete this observation?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This observation will be permanently removed.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

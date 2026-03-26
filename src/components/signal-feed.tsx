@@ -17,6 +17,17 @@ import { AddInputModal } from '@/components/add-input-modal';
 import { AddObservationModal } from '@/components/add-observation-modal';
 import { AgentRunModal } from '@/components/agent-run-modal';
 import { EvaluateSignalsModal } from '@/components/evaluate-signals-modal';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const DAILY_QUESTIONS = [
   'Where is something growing fast but being served poorly?',
@@ -88,6 +99,7 @@ function InputCard({
   };
 
   return (
+    <AlertDialog>
     <div
       className={`group hover:border-border/80 relative rounded border p-3 transition-colors ${styles.border} bg-card`}
     >
@@ -109,14 +121,15 @@ function InputCard({
                 <p className="text-foreground line-clamp-2 text-sm leading-snug">{input.title}</p>
               )}
             </div>
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="text-muted-foreground hover:text-destructive-foreground mt-0.5 shrink-0 text-xs opacity-0 transition-all group-hover:opacity-100"
-              aria-label="Delete input"
-            >
-              ✕
-            </button>
+            <AlertDialogTrigger asChild>
+              <button
+                disabled={deleting}
+                className="text-muted-foreground hover:text-destructive-foreground mt-0.5 shrink-0 text-xs opacity-0 transition-all group-hover:opacity-100"
+                aria-label="Delete input"
+              >
+                ✕
+              </button>
+            </AlertDialogTrigger>
           </div>
 
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -156,6 +169,21 @@ function InputCard({
         </div>
       </div>
     </div>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete this signal?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This signal will be permanently removed.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

@@ -4,6 +4,17 @@ import useSWR from 'swr';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { AddTruthModal } from '@/components/add-truth-modal';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -92,6 +103,7 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
   };
 
   return (
+    <AlertDialog>
     <div
       className={`group relative rounded border p-3 transition-colors ${styles.classes} ${truth.status === 'invalidated' ? 'opacity-40' : ''}`}
     >
@@ -154,19 +166,35 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
               >
                 Invalidate
               </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="text-muted-foreground hover:text-destructive-foreground ml-auto font-mono text-[10px] transition-colors"
-                aria-label="Delete thesis"
-              >
-                ✕
-              </button>
+              <AlertDialogTrigger asChild>
+                <button
+                  disabled={deleting}
+                  className="text-muted-foreground hover:text-destructive-foreground ml-auto font-mono text-[10px] transition-colors"
+                  aria-label="Delete thesis"
+                >
+                  ✕
+                </button>
+              </AlertDialogTrigger>
             </div>
           )}
         </div>
       </div>
     </div>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete this thesis?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This thesis and all its conviction history will be permanently removed.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
