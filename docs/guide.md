@@ -272,3 +272,11 @@ Post your answers as a comment on GitHub Issue #2:
 ---
 
 _Last updated: March 26, 2026_
+
+---
+
+<!-- Sync to modryn-studio-v2 (strips internal sections before publishing):
+node -e "const fs=require('fs');const g=fs.readFileSync('docs/guide.md','utf8');const cut=g.indexOf('\n---\n\n## After 3');const p='C:/Users/Luke/Documents/Dev/modryn-studio-v2/content/tools/signal-intelligence.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j.guide=g.slice(0,cut).trimEnd();fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n','utf8');"
+Then commit + push in modryn-studio-v2.
+NOTE: Sections below ("After 3-5 days" and "What is and is not working") are internal only — not published.
+-->
