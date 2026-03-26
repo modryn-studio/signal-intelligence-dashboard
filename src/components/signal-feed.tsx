@@ -5,8 +5,36 @@ import { useState } from 'react';
 import type { SignalInput } from '@/lib/types';
 import { SOURCE_CATEGORIES } from '@/lib/types';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ChevronDownIcon } from 'lucide-react';
 import { AddInputModal } from '@/components/add-input-modal';
 import { AddObservationModal } from '@/components/add-observation-modal';
+import { AgentRunModal } from '@/components/agent-run-modal';
+import { EvaluateSignalsModal } from '@/components/evaluate-signals-modal';
+
+const DAILY_QUESTIONS = [
+  'Where is something growing fast but being served poorly?',
+  'What do people keep complaining about that no one has fixed?',
+  'Which market is 10x bigger than people think it is?',
+  'What belief do most people in this space hold that is wrong?',
+  'Where is the gap between what people pay for and what they actually need?',
+  'What would you build if you knew this trend continued for 5 more years?',
+  'Which problem keeps appearing in multiple places at once?',
+];
+
+function getTodayQuestion(): string {
+  const today = new Date();
+  const dayOfYear = Math.floor(
+    (today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000
+  );
+  return DAILY_QUESTIONS[dayOfYear % DAILY_QUESTIONS.length];
+}
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -64,7 +92,7 @@ function InputCard({
       className={`group hover:border-border/80 relative rounded border p-3 transition-colors ${styles.border} bg-card`}
     >
       <div className="flex items-start gap-2.5">
-        <span className={`mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full ${styles.dot}`} />
+        <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${styles.dot}`} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
@@ -84,7 +112,7 @@ function InputCard({
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="text-muted-foreground hover:text-destructive-foreground mt-0.5 flex-shrink-0 text-xs opacity-0 transition-all group-hover:opacity-100"
+              className="text-muted-foreground hover:text-destructive-foreground mt-0.5 shrink-0 text-xs opacity-0 transition-all group-hover:opacity-100"
               aria-label="Delete input"
             >
               ✕
@@ -136,15 +164,21 @@ export function SignalFeed() {
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addCategory, setAddCategory] = useState<Category>('trends');
-  const [agentStatus, setAgentStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
-  const [agentCount, setAgentCount] = useState(0);
+  const [agentModalOpen, setAgentModalOpen] = useState(false);
+  const [evaluateModalOpen, setEvaluateModalOpen] = useState(false);
   const [observeModalOpen, setObserveModalOpen] = useState(false);
   const [observePrefill, setObservePrefill] = useState<
-    { body: string; relatedInputIds: number[] } | undefined
+    { body: string; relatedInputIds: number[]; title?: string; tags?: string } | undefined
   >(undefined);
 
   const openObserveModal = (input: SignalInput) => {
-    setObservePrefill({ body: input.title, relatedInputIds: [input.id] });
+    setObservePrefill({
+      body: input.title,
+      relatedInputIds: [input.id],
+      // Claude's insight note → suggested title; category → seed tag
+      title: input.notes ?? undefined,
+      tags: input.source_category,
+    });
     setObserveModalOpen(true);
   };
 
@@ -160,20 +194,12 @@ export function SignalFeed() {
     setAddModalOpen(true);
   };
 
-  const runAgent = async () => {
-    setAgentStatus('loading');
-    try {
-      const res = await fetch('/api/agent/run', { method: 'POST' });
-      if (!res.ok) throw new Error('Failed');
-      const data = (await res.json()) as { logged: number };
-      setAgentCount(data.logged);
-      setAgentStatus('done');
-      mutate();
-      setTimeout(() => setAgentStatus('idle'), 3000);
-    } catch {
-      setAgentStatus('error');
-      setTimeout(() => setAgentStatus('idle'), 3000);
-    }
+  const runAgent = async (): Promise<{ logged: number }> => {
+    const res = await fetch('/api/agent/run', { method: 'POST' });
+    if (!res.ok) throw new Error('Failed');
+    const data = (await res.json()) as { logged: number };
+    mutate();
+    return data;
   };
 
   const grouped = (inputs || []).reduce(
@@ -201,20 +227,33 @@ export function SignalFeed() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            onClick={runAgent}
-            disabled={agentStatus === 'loading'}
-            size="sm"
-            className="border-border text-muted-foreground hover:text-foreground h-7 border bg-transparent px-3 font-mono text-xs tracking-wider disabled:opacity-40"
-          >
-            {agentStatus === 'loading'
-              ? 'Scanning...'
-              : agentStatus === 'done'
-                ? `${agentCount} logged`
-                : agentStatus === 'error'
-                  ? 'Failed'
-                  : 'Run Agent'}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                className="border-border text-muted-foreground hover:text-foreground h-7 border bg-transparent px-3 font-mono text-xs tracking-wider"
+              >
+                Agent
+                <ChevronDownIcon className="ml-1 h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="font-mono text-xs">
+              <DropdownMenuItem
+                onSelect={() => setAgentModalOpen(true)}
+                className="font-mono text-xs"
+              >
+                Run Agent
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => setEvaluateModalOpen(true)}
+                disabled={!inputs || inputs.length === 0}
+                className="font-mono text-xs"
+              >
+                Deep Evaluate
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             onClick={() => openAdd()}
             size="sm"
@@ -278,7 +317,7 @@ export function SignalFeed() {
               rel="noopener noreferrer"
               className={`hover:border-border/80 flex items-center gap-2 rounded border px-2.5 py-1.5 text-xs transition-colors ${styles.border} bg-card group`}
             >
-              <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${styles.dot}`} />
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${styles.dot}`} />
               <span className="text-muted-foreground group-hover:text-foreground font-mono transition-colors">
                 {link.name}
               </span>
@@ -365,6 +404,21 @@ export function SignalFeed() {
         onClose={() => setObserveModalOpen(false)}
         onSaved={() => mutate()}
         prefill={observePrefill}
+      />
+
+      <AgentRunModal
+        open={agentModalOpen}
+        question={getTodayQuestion()}
+        onClose={() => setAgentModalOpen(false)}
+        onRun={runAgent}
+        onDeepEvaluate={() => setEvaluateModalOpen(true)}
+      />
+
+      <EvaluateSignalsModal
+        open={evaluateModalOpen}
+        onClose={() => setEvaluateModalOpen(false)}
+        onSignalDeleted={() => mutate()}
+        onObservationSaved={() => mutate()}
       />
     </div>
   );

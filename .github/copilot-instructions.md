@@ -49,6 +49,7 @@ schema.sql              → one-time Neon DB bootstrap (already run)
 - `/api/digest` → Weekly digest generation — email-ready summary
 - `/api/feedback` → Feedback submissions + newsletter signup
 - `/api/agent/run` → POST — fetches HN, Product Hunt, Indie Hackers, r/SaaS, r/Entrepreneur; filters via Claude; inserts to signal_inputs tagged `agent`
+- `/api/agent/evaluate` → POST — fetches real source content (Reddit JSON, HN Algolia, article HTML), calls Claude (`claude-sonnet-4-6`) with `web_search_20260209` tool (max 3 uses), returns `EvaluationResult[]` + `Synthesis`; results cached in localStorage by date
 
 ## Brand & Voice
 

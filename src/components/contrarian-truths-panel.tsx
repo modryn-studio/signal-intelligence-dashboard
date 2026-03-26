@@ -97,7 +97,7 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
     >
       <div className="flex items-start gap-2">
         {/* Conviction pips */}
-        <div className="mt-1 flex flex-shrink-0 flex-col gap-0.5">
+        <div className="mt-1 flex shrink-0 flex-col gap-0.5">
           {[5, 4, 3, 2, 1].map((n) => (
             <span
               key={n}

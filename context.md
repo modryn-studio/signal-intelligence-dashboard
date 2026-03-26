@@ -42,7 +42,7 @@ Current: email-only — no payment gate.
 - schema.sql — one-time DB bootstrap (already run in Neon)
 - lib/db.ts — Neon singleton export
 - lib/types.ts — shared TypeScript types
-- app/api/ — six domain API routes (inputs, observations, truths, contrarian-truths, stats, digest)
+- app/api/ — seven domain API routes (inputs, observations, truths, stats, digest, agent/run, agent/evaluate)
 
 ## Route Map
 
@@ -53,9 +53,10 @@ Current: email-only — no payment gate.
 - `/api/stats` → Aggregate stats for dashboard header
 - `/api/digest` → Weekly digest generation
 - `/api/feedback` → Feedback + newsletter signup (boilerplate standard)
-- `/api/agent/run` → POST — fetches HN, Product Hunt, Indie Hackers, r/SaaS, r/Entrepreneur; filters via Claude (claude-sonnet-4-6); inserts to signal_inputs tagged `agent`
+- `/api/agent/run` → POST — fetches HN, Product Hunt, Indie Hackers, r/SaaS, r/Entrepreneur; filters via Claude; inserts to signal_inputs tagged `agent`
+- `/api/agent/evaluate` → POST — fetches actual source content (Reddit JSON, HN Algolia, article HTML), calls Claude with web search, returns `EvaluationResult[]` + `Synthesis`
 
-## Current State (as of March 25, 2026)
+## Current State (as of March 26, 2026)
 
 Insight chain is fully wired: Signal → Observation → Thesis.
 
@@ -64,9 +65,23 @@ Insight chain is fully wired: Signal → Observation → Thesis.
 - PATCH `/api/truths` accepts `appendObservationId` — uses `array_append()` to merge without overwriting.
 - Truth cards show `supporting_observations.length` as "N obs".
 
-Phase 2 is planned but on hold. Using the system for 3–5 days first to validate the chain produces insight before improving the agent. Tracked in GitHub Issue #2.
+Agent dropdown ("Agent ▾") in signal feed header — two actions:
 
-Phase 2 will: add a two-step Claude classification chain, include HN comment counts, rewrite the agent prompt for "high pain, low solution density", add a `reason` field per selected signal, and fix the Product Hunt date filter.
+- **Run Agent** — fetches and filters signals via Claude, shows step-progress modal, offers "→ Deep evaluate" shortcut on completion.
+- **Deep Evaluate** — opens EvaluateSignalsModal. Fetches real source content per signal, calls Claude (claude-sonnet-4-6) with `web_search_20260209` tool (max 3 uses per run). Returns per-card verdicts (observe/skip/delete) + a Synthesis block (priority signals, pattern, thesis candidate). Results cached in localStorage by date; Re-run button force-refreshes.
+
+EvaluateSignalsModal one-click loop:
+
+- Collapsible Analysis panel shows synthesis (priority, pattern, thesis candidate).
+- "✓ Accept top signals + form thesis" button: saves priority signal(s) as observations → POSTs to `/api/truths` with linked observation IDs. One click closes the signal → observation → thesis chain.
+- Individual cards: Accept (saves observation) or Delete.
+- Filter tabs: observe / skip / delete / all.
+
+Evaluate prompt lens: "Where is something growing fast but being served poorly?" OBSERVE requires evidence of BOTH growth (adoption, scale, engagement numbers) AND poor service (no dominant solution, DIY workarounds, people still stuck). proposed_body is two grounded sentences — growth evidence, then service failure — no assertions beyond what source content confirms. thesis_candidate is a contrarian belief about market misconfiguration, not a product pitch.
+
+Phase 2 is planned but on hold. Using the system for 3–5 days to validate the chain produces insight before improving the agent. Tracked in GitHub Issue #2.
+
+Phase 2 will: add a two-step Claude classification chain, include HN comment counts, add a `reason` field per selected signal (pre-fills observation body), and fix the Product Hunt date filter.
 
 ## Monetization
 

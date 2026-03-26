@@ -137,7 +137,6 @@ async function fetchIndieHackers(): Promise<FetchedItem[]> {
     if (nextDataMatch?.[1]) {
       try {
         const nextData = JSON.parse(nextDataMatch[1]) as Record<string, unknown>;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const pageProps = (nextData as any)?.props?.pageProps;
         const posts: Array<Record<string, unknown>> =
           pageProps?.posts ?? pageProps?.stories ?? pageProps?.feed ?? pageProps?.items ?? [];
@@ -148,8 +147,7 @@ async function fetchIndieHackers(): Promise<FetchedItem[]> {
               id: `ih_${(post.id as string) ?? (post.slug as string) ?? i}`,
               title: (post.title as string) ?? (post.rawTitle as string) ?? '',
               url:
-                (post.url as string) ??
-                `https://www.indiehackers.com/post/${post.slug as string}`,
+                (post.url as string) ?? `https://www.indiehackers.com/post/${post.slug as string}`,
               source: 'Indie Hackers',
               defaultCategory: 'indie' as SourceCategory,
               score: (post.upvoteCount as number) ?? (post.score as number) ?? 0,
@@ -290,11 +288,19 @@ Respond with ONLY valid JSON, no markdown fences, no explanation:
     }
 
     const today = new Date().toISOString().split('T')[0];
+
+    // Pre-load URLs already logged today to avoid duplicates on repeated runs
+    const existing = (await sql`
+      SELECT url FROM signal_inputs WHERE date = ${today} AND url IS NOT NULL
+    `) as { url: string }[];
+    const existingUrls = new Set(existing.map((r) => r.url));
+
     let logged = 0;
 
     for (const sel of selected) {
       const item = itemMap.get(sel.id);
       if (!item) continue;
+      if (item.url && existingUrls.has(item.url)) continue; // already logged today
       const tags = ['agent'];
       await sql`
         INSERT INTO signal_inputs (date, source, source_category, title, url, notes, tags)

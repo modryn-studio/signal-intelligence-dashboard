@@ -59,7 +59,7 @@ function ObservationCard({
         <button
           onClick={handleDelete}
           disabled={deleting}
-          className="text-muted-foreground hover:text-destructive-foreground mt-0.5 flex-shrink-0 text-xs opacity-0 transition-all group-hover:opacity-100"
+          className="text-muted-foreground hover:text-destructive-foreground mt-0.5 shrink-0 text-xs opacity-0 transition-all group-hover:opacity-100"
           aria-label="Delete observation"
         >
           ✕

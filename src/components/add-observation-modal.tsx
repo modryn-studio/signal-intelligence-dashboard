@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 interface Prefill {
   body: string;
   relatedInputIds: number[];
+  title?: string;
+  tags?: string;
 }
 
 interface AddObservationModalProps {
@@ -26,16 +28,15 @@ export function AddObservationModal({ open, onClose, onSaved, prefill }: AddObse
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Reset state on open; pre-populate body from signal when available
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Reset state on open; pre-populate from signal when available
   useEffect(() => {
     if (open) {
-      setTitle('');
+      setTitle(prefill?.title ?? '');
       setBody(prefill?.body ?? '');
-      setTags('');
+      setTags(prefill?.tags ?? '');
       setError('');
     }
-  }, [open]);
+  }, [open, prefill?.title, prefill?.body, prefill?.tags]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
