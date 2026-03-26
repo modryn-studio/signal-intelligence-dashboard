@@ -115,11 +115,13 @@ $isGrayscale = $maxSat -lt 0.05
 $negateFrag  = if ($isGrayscale) { @('-channel', 'RGB', '-negate') } else { @() }
 
 # -- icon.png - browser tab favicon --------------------------------------------
-magick $logomark -background none -trim +repage -resize 1024x1024 -gravity Center -background none -extent 1024x1024 "src\app\icon.png"
+# Resize to 80% of canvas to add safe padding on all sides (prevents edge clipping)
+magick $logomark -background none -trim +repage -resize 819x819 -gravity Center -background none -extent 1024x1024 "src\app\icon.png"
 Write-Host "  + app/icon.png"
 
 # -- favicon.ico - legacy multi-resolution -------------------------------------
-magick $logomark -background none -trim +repage -resize 256x256 -gravity Center -background none -extent 256x256 -define icon:auto-resize=48,32,16 "src\app\favicon.ico"
+# Same 80% rule applied at favicon scale
+magick $logomark -background none -trim +repage -resize 204x204 -gravity Center -background none -extent 256x256 -define icon:auto-resize=48,32,16 "src\app\favicon.ico"
 Write-Host "  + app/favicon.ico"
 
 # -- apple-icon.png - iOS home screen ------------------------------------------
@@ -132,16 +134,17 @@ Write-Host "  + app/apple-icon.png"
 # -- Favicon pair - light / dark mode ------------------------------------------
 if (Test-Path $logomarkDark) {
     Write-Host "  favicon mode: DUAL" -ForegroundColor DarkGray
-    Copy-Item $logomark     "public\icon-light.png"
-    Copy-Item $logomarkDark "public\icon-dark.png"
+    magick $logomark     -background none -trim +repage -resize 819x819 -gravity Center -background none -extent 1024x1024 "public\icon-light.png"
+    magick $logomarkDark -background none -trim +repage -resize 819x819 -gravity Center -background none -extent 1024x1024 "public\icon-dark.png"
 } elseif ($isGrayscale) {
     Write-Host "  favicon mode: AUTO (grayscale - inverting for dark mode)" -ForegroundColor DarkGray
-    Copy-Item $logomark "public\icon-light.png"
-    magick $logomark -background none -channel RGB -negate "public\icon-dark.png"
+    magick $logomark -background none -trim +repage -resize 819x819 -gravity Center -background none -extent 1024x1024 "public\icon-light.png"
+    magick $logomark -background none -trim +repage -resize 819x819 -gravity Center -background none -extent 1024x1024 -channel RGB -negate "public\icon-dark.png"
 } else {
     Write-Host "  favicon mode: SINGLE (colored mark)" -ForegroundColor DarkGray
-    Copy-Item $logomark "public\icon-light.png"
-    Copy-Item $logomark "public\icon-dark.png"
+    # Add padding: resize to 80% of 1024x1024 square canvas
+    magick $logomark -background none -trim +repage -resize 819x819 -gravity Center -background none -extent 1024x1024 "public\icon-light.png"
+    magick $logomark -background none -trim +repage -resize 819x819 -gravity Center -background none -extent 1024x1024 "public\icon-dark.png"
 }
 Write-Host "  + public/icon-light.png"
 Write-Host "  + public/icon-dark.png"
