@@ -45,22 +45,22 @@ export interface EmailDigest {
 
 export const SOURCE_CATEGORIES: Record<SourceCategory, { label: string; color: string; sources: string[] }> = {
   trends: {
-    label: 'Trends & Emerging',
+    label: 'Trends',
     color: 'text-[oklch(0.75_0.18_142)]',
     sources: ['Hacker News', 'Product Hunt', 'a16z Blog', 'Sequoia Blog', 'YC Blog'],
   },
   complaints: {
-    label: 'Pain & Complaints',
+    label: 'Complaints',
     color: 'text-[oklch(0.72_0.19_27)]',
     sources: ['Reddit', 'G2 Reviews', 'Trustpilot', 'App Store Reviews', 'Twitter/X'],
   },
   indie: {
-    label: 'Indie Builders',
+    label: 'Indie',
     color: 'text-[oklch(0.72_0.16_264)]',
     sources: ['Indie Hackers', 'Twitter/X Builders', 'MicroConf', 'Starter Story'],
   },
   data: {
-    label: 'Raw Search Data',
+    label: 'Data',
     color: 'text-[oklch(0.75_0.15_55)]',
     sources: ['Google Trends', 'Exploding Topics', 'Semrush', 'Ahrefs'],
   },

@@ -88,81 +88,79 @@ function InputCard({
 
   return (
     <AlertDialog>
-    <div
-      className={`group hover:border-border/80 relative rounded border p-3 transition-colors ${styles.border} bg-card`}
-    >
-      <div className="flex items-start gap-2.5">
-        <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${styles.dot}`} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              {input.url ? (
-                <a
-                  href={input.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-foreground hover:text-primary line-clamp-2 text-sm leading-snug transition-colors"
+      <div
+        className={`group hover:border-border/80 relative rounded border p-3 transition-colors ${styles.border} bg-card`}
+      >
+        <div className="flex items-start gap-2.5">
+          <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${styles.dot}`} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                {input.url ? (
+                  <a
+                    href={input.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-foreground hover:text-primary line-clamp-2 text-sm leading-snug transition-colors"
+                  >
+                    {input.title}
+                  </a>
+                ) : (
+                  <p className="text-foreground line-clamp-2 text-sm leading-snug">{input.title}</p>
+                )}
+              </div>
+              <AlertDialogTrigger asChild>
+                <button
+                  disabled={deleting}
+                  className="text-muted-foreground hover:text-destructive-foreground mt-0.5 shrink-0 text-xs opacity-0 transition-all group-hover:opacity-100"
+                  aria-label="Delete input"
                 >
-                  {input.title}
-                </a>
-              ) : (
-                <p className="text-foreground line-clamp-2 text-sm leading-snug">{input.title}</p>
-              )}
+                  ✕
+                </button>
+              </AlertDialogTrigger>
             </div>
-            <AlertDialogTrigger asChild>
-              <button
-                disabled={deleting}
-                className="text-muted-foreground hover:text-destructive-foreground mt-0.5 shrink-0 text-xs opacity-0 transition-all group-hover:opacity-100"
-                aria-label="Delete input"
+
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded px-1.5 py-0.5 font-mono text-[10px] ${styles.bg} ${styles.text}`}
               >
-                ✕
-              </button>
-            </AlertDialogTrigger>
-          </div>
-
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded px-1.5 py-0.5 font-mono text-[10px] ${styles.bg} ${styles.text}`}
-            >
-              {input.source}
-            </span>
-            {input.tags?.map((tag) => (
-              <span key={tag} className="text-muted-foreground font-mono text-[10px]">
-                #{tag}
+                {input.source}
               </span>
-            ))}
-            <span className="text-muted-foreground ml-auto font-mono text-[10px]">
-              {new Date(input.created_at).toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </span>
-          </div>
+              {input.tags?.map((tag) => (
+                <span key={tag} className="text-muted-foreground font-mono text-[10px]">
+                  #{tag}
+                </span>
+              ))}
+              <span className="text-muted-foreground ml-auto font-mono text-[10px]">
+                {new Date(input.created_at).toLocaleTimeString('en-US', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
+            </div>
 
-          {input.notes && (
-            <p className="text-muted-foreground border-border mt-2 border-l pl-2 text-xs leading-relaxed italic">
-              {input.notes}
-            </p>
-          )}
+            {input.notes && (
+              <p className="text-muted-foreground border-border mt-2 border-l pl-2 text-xs leading-relaxed italic">
+                {input.notes}
+              </p>
+            )}
 
-          {/* Actions – shown on hover */}
-          <div className="mt-1.5 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-            <button
-              onClick={onObserve}
-              className="text-muted-foreground hover:text-foreground border-border hover:border-muted-foreground rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
-            >
-              &rarr; Observe
-            </button>
+            {/* Actions – shown on hover */}
+            <div className="mt-1.5 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+              <button
+                onClick={onObserve}
+                className="text-muted-foreground hover:text-foreground border-border hover:border-muted-foreground rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
+              >
+                &rarr; Observe
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete this signal?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This signal will be permanently removed.
-          </AlertDialogDescription>
+          <AlertDialogDescription>This signal will be permanently removed.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -239,12 +237,20 @@ export function SignalFeed() {
             .then(async (r) => {
               if (!r.ok) return;
               const entry = await r.json();
-              try { localStorage.setItem(getTodayEvalCacheKey(), JSON.stringify(entry)); } catch { /* quota */ }
+              try {
+                localStorage.setItem(getTodayEvalCacheKey(), JSON.stringify(entry));
+              } catch {
+                /* quota */
+              }
             })
-            .catch(() => { /* silent fail */ })
+            .catch(() => {
+              /* silent fail */
+            })
             .finally(() => setEvalPrewarming(false));
         }
-      } catch { /* localStorage unavailable */ }
+      } catch {
+        /* localStorage unavailable */
+      }
     }
     return data;
   };
@@ -280,12 +286,15 @@ export function SignalFeed() {
             <p className="text-muted-foreground/60 text-xs">
               {isToday
                 ? `${inputs?.length || 0} captured today`
-                : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                  })}
             </p>
             <button
               onClick={() => shiftDay(1)}
               disabled={isToday}
-              className="text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+              className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
               aria-label="Next day"
             >
               <ChevronRightIcon className="h-3 w-3" />
@@ -356,7 +365,7 @@ export function SignalFeed() {
                   : 'border-border text-muted-foreground hover:border-muted-foreground'
               }`}
             >
-              {SOURCE_CATEGORIES[cat].label.split(' ')[0]}
+              {SOURCE_CATEGORIES[cat].label}
             </button>
           );
         })}
@@ -437,12 +446,12 @@ export function SignalFeed() {
                       ({grouped[cat].length})
                     </span>
                     {isToday && (
-                    <button
-                      onClick={() => openAdd(cat)}
-                      className={`ml-auto font-mono text-[10px] ${CATEGORY_STYLES[cat].text} opacity-60 hover:opacity-100`}
-                    >
-                      + add
-                    </button>
+                      <button
+                        onClick={() => openAdd(cat)}
+                        className={`ml-auto font-mono text-[10px] ${CATEGORY_STYLES[cat].text} opacity-60 hover:opacity-100`}
+                      >
+                        + add
+                      </button>
                     )}
                   </div>
                   {grouped[cat].map((input) => (

@@ -104,7 +104,7 @@ export function AddInputModal({ open, onClose, onSaved, defaultCategory = 'trend
                     : 'border-border text-muted-foreground hover:border-muted-foreground'
                 }`}
               >
-                {SOURCE_CATEGORIES[cat].label.split(' ')[0]}
+                {SOURCE_CATEGORIES[cat].label}
               </button>
             ))}
           </div>
