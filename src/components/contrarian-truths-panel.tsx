@@ -104,6 +104,23 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
     onUpdate();
   };
 
+  const handleSetConviction = async (level: number) => {
+    if (updating || level === truth.conviction_level) return;
+    setUpdating(true);
+    await fetch('/api/truths', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: truth.id, conviction_level: level }),
+    });
+    onUpdate();
+    setUpdating(false);
+  };
+
+  const handleCycleConviction = () => {
+    const next = truth.conviction_level >= 5 ? 1 : truth.conviction_level + 1;
+    void handleSetConviction(next);
+  };
+
   return (
     <>
       <AlertDialog open={advanceDialogOpen} onOpenChange={setAdvanceDialogOpen}>
@@ -145,12 +162,15 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
           className={`group relative rounded border p-3 transition-colors ${styles.classes} ${truth.status === 'invalidated' ? 'opacity-40' : ''}`}
         >
           <div className="flex items-start gap-2">
-            {/* Conviction pips */}
-            <div className="mt-1 flex shrink-0 flex-col gap-0.5">
+            {/* Conviction pips — click to set level */}
+            <div className="group/pips mt-1 flex shrink-0 flex-col gap-0.5">
               {[5, 4, 3, 2, 1].map((n) => (
-                <span
+                <button
                   key={n}
-                  className={`h-1 w-1 rounded-full transition-colors ${
+                  title={CONVICTION_LABELS[n]}
+                  onClick={() => handleSetConviction(n)}
+                  disabled={updating}
+                  className={`h-2 w-2 rounded-full transition-all hover:scale-125 disabled:cursor-default ${
                     n <= truth.conviction_level ? 'bg-current opacity-90' : 'bg-current opacity-15'
                   }`}
                 />
@@ -169,7 +189,15 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
                   {styles.label}
                 </span>
                 <span className="text-muted-foreground font-mono text-[10px]">
-                  {CONVICTION_LABELS[truth.conviction_level]} ({truth.conviction_level}/5)
+                  <button
+                    onClick={handleCycleConviction}
+                    disabled={updating}
+                    title="Click to increase conviction"
+                    className="hover:text-foreground cursor-pointer transition-colors disabled:cursor-default"
+                  >
+                    {CONVICTION_LABELS[truth.conviction_level]}
+                  </button>
+                  {' '}({truth.conviction_level}/5)
                 </span>
                 {(truth.supporting_observations?.length ?? 0) > 0 && (
                   <span className="text-muted-foreground font-mono text-[10px]">
