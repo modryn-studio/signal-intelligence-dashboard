@@ -1,8 +1,9 @@
 'use client';
 
 import useSWR from 'swr';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { Observation } from '@/lib/types';
+import { getQuestionForDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { AddObservationModal } from '@/components/add-observation-modal';
 import { ObservationTruthPickerModal } from '@/components/observation-truth-picker-modal';
@@ -108,6 +109,16 @@ export function ObservationsPanel() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerObsId, setPickerObsId] = useState<number | null>(null);
+  const today = new Date().toISOString().split('T')[0];
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, Observation[]>();
+    for (const obs of observations ?? []) {
+      if (!map.has(obs.date)) map.set(obs.date, []);
+      map.get(obs.date)!.push(obs);
+    }
+    return map;
+  }, [observations]);
 
   const openPicker = (obsId: number) => {
     setPickerObsId(obsId);
@@ -135,16 +146,6 @@ export function ObservationsPanel() {
         </Button>
       </div>
 
-      {/* The question */}
-      <div className="border-border/50 rounded border border-dashed p-3">
-        <p className="text-muted-foreground/50 mb-1 font-mono text-[10px] tracking-widest uppercase">
-          Today&apos;s lens
-        </p>
-        <p className="text-muted-foreground text-xs leading-relaxed italic">
-          &ldquo;Where is something growing fast but being served poorly?&rdquo;
-        </p>
-      </div>
-
       {/* Observations list */}
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto pr-1">
         {(!observations || observations.length === 0) && (
@@ -166,13 +167,30 @@ export function ObservationsPanel() {
           </div>
         )}
 
-        {(observations || []).map((obs) => (
-          <ObservationCard
-            key={obs.id}
-            obs={obs}
-            onDelete={() => mutate()}
-            onAddToThesis={openPicker}
-          />
+        {[...grouped.entries()].map(([date, group]) => (
+          <div key={date} className="flex flex-col gap-2">
+            <div className="mt-1 mb-1">
+              <p className="text-muted-foreground/60 font-mono text-[10px] tracking-widest uppercase">
+                {date === today
+                  ? 'Today'
+                  : new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+              </p>
+              <p className="text-muted-foreground/35 mt-0.5 text-[10px] italic leading-snug">
+                &ldquo;{getQuestionForDate(date)}&rdquo;
+              </p>
+            </div>
+            {group.map((obs) => (
+              <ObservationCard
+                key={obs.id}
+                obs={obs}
+                onDelete={() => mutate()}
+                onAddToThesis={openPicker}
+              />
+            ))}
+          </div>
         ))}
       </div>
 

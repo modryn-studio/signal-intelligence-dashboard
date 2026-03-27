@@ -22,3 +22,11 @@ export function getTodayQuestion(): string {
   );
   return DAILY_QUESTIONS[dayOfYear % DAILY_QUESTIONS.length];
 }
+
+export function getQuestionForDate(dateStr: string): string {
+  const date = new Date(dateStr + 'T12:00:00');
+  const dayOfYear = Math.floor(
+    (date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / 86400000
+  );
+  return DAILY_QUESTIONS[dayOfYear % DAILY_QUESTIONS.length];
+}
