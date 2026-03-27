@@ -1,7 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import type { Observation } from '@/lib/types';
 import { getQuestionForDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -109,6 +109,8 @@ export function ObservationsPanel() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerObsId, setPickerObsId] = useState<number | null>(null);
+  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
+  const initializedRef = useRef(false);
   const today = new Date().toISOString().split('T')[0];
 
   const grouped = useMemo(() => {
@@ -120,6 +122,23 @@ export function ObservationsPanel() {
     }
     return map;
   }, [observations]);
+
+  // Collapse all past dates on first data load; preserve user toggles on subsequent SWR refreshes
+  useEffect(() => {
+    if (initializedRef.current || grouped.size === 0) return;
+    initializedRef.current = true;
+    const pastDates = [...grouped.keys()].filter((d) => d !== today);
+    if (pastDates.length > 0) setCollapsedDates(new Set(pastDates));
+  }, [grouped, today]);
+
+  const toggleDate = (date: string) => {
+    setCollapsedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      return next;
+    });
+  };
 
   const openPicker = (obsId: number) => {
     setPickerObsId(obsId);
@@ -170,27 +189,41 @@ export function ObservationsPanel() {
 
         {[...grouped.entries()].map(([date, group]) => (
           <div key={date} className="flex flex-col gap-2">
-            <div className="mt-1 mb-1">
-              <p className="text-muted-foreground/60 font-mono text-[10px] tracking-widest uppercase">
-                {date === today
-                  ? 'Today'
-                  : new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-              </p>
-              <p className="text-muted-foreground/35 mt-0.5 text-[10px] italic leading-snug">
-                &ldquo;{getQuestionForDate(date)}&rdquo;
-              </p>
-            </div>
-            {group.map((obs) => (
-              <ObservationCard
-                key={obs.id}
-                obs={obs}
-                onDelete={() => mutate()}
-                onAddToThesis={openPicker}
-              />
-            ))}
+            <button
+              onClick={() => toggleDate(date)}
+              className="mt-1 mb-1 flex w-full cursor-pointer items-start gap-1.5 text-left"
+            >
+              <span
+                className="text-muted-foreground/40 mt-0.5 inline-block font-mono text-[10px] transition-transform duration-150"
+                style={{ transform: collapsedDates.has(date) ? 'rotate(0deg)' : 'rotate(90deg)' }}
+              >
+                ›
+              </span>
+              <div className="min-w-0">
+                <p className="text-muted-foreground/60 font-mono text-[10px] tracking-widest uppercase">
+                  {date === today
+                    ? 'Today'
+                    : new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                </p>
+                {!collapsedDates.has(date) && (
+                  <p className="text-muted-foreground/35 mt-0.5 text-[10px] italic leading-snug">
+                    &ldquo;{getQuestionForDate(date)}&rdquo;
+                  </p>
+                )}
+              </div>
+            </button>
+            {!collapsedDates.has(date) &&
+              group.map((obs) => (
+                <ObservationCard
+                  key={obs.id}
+                  obs={obs}
+                  onDelete={() => mutate()}
+                  onAddToThesis={openPicker}
+                />
+              ))}
           </div>
         ))}
       </div>
