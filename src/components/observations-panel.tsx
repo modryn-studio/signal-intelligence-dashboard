@@ -153,9 +153,6 @@ export function ObservationsPanel() {
           <h2 className="text-muted-foreground font-mono text-xs tracking-widest uppercase">
             Observations
           </h2>
-          <p className="text-muted-foreground/60 mt-0.5 text-xs">
-            Patterns you&apos;re beginning to see
-          </p>
         </div>
         <Button
           onClick={() => setAddModalOpen(true)}
@@ -207,6 +204,11 @@ export function ObservationsPanel() {
                         month: 'short',
                         day: 'numeric',
                       })}
+                  {collapsedDates.has(date) && (
+                    <span className="text-muted-foreground/40 ml-1 normal-case">
+                      ({group.length})
+                    </span>
+                  )}
                 </p>
                 {!collapsedDates.has(date) && (
                   <p className="text-muted-foreground/35 mt-0.5 text-[10px] leading-snug italic">

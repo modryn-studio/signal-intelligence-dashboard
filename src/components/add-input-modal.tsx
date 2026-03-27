@@ -18,10 +18,10 @@ interface AddInputModalProps {
 }
 
 const CATEGORY_COLORS: Record<Category, string> = {
-  trends: 'text-[oklch(0.75_0.18_142)]',
-  complaints: 'text-[oklch(0.72_0.19_27)]',
-  indie: 'text-[oklch(0.72_0.16_264)]',
-  data: 'text-[oklch(0.75_0.15_55)]',
+  trends: 'text-signal-trends',
+  complaints: 'text-signal-complaints',
+  indie: 'text-signal-indie',
+  data: 'text-signal-data',
 };
 
 export function AddInputModal({

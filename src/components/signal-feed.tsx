@@ -42,28 +42,28 @@ type Category = keyof typeof SOURCE_CATEGORIES;
 const CATEGORY_STYLES: Record<Category, { dot: string; text: string; border: string; bg: string }> =
   {
     trends: {
-      dot: 'bg-[oklch(0.75_0.18_142)]',
-      text: 'text-[oklch(0.75_0.18_142)]',
-      border: 'border-[oklch(0.75_0.18_142)]/30',
-      bg: 'bg-[oklch(0.75_0.18_142)]/10',
+      dot: 'bg-signal-trends',
+      text: 'text-signal-trends',
+      border: 'border-signal-trends/30',
+      bg: 'bg-signal-trends/10',
     },
     complaints: {
-      dot: 'bg-[oklch(0.72_0.19_27)]',
-      text: 'text-[oklch(0.72_0.19_27)]',
-      border: 'border-[oklch(0.72_0.19_27)]/30',
-      bg: 'bg-[oklch(0.72_0.19_27)]/10',
+      dot: 'bg-signal-complaints',
+      text: 'text-signal-complaints',
+      border: 'border-signal-complaints/30',
+      bg: 'bg-signal-complaints/10',
     },
     indie: {
-      dot: 'bg-[oklch(0.72_0.16_264)]',
-      text: 'text-[oklch(0.72_0.16_264)]',
-      border: 'border-[oklch(0.72_0.16_264)]/30',
-      bg: 'bg-[oklch(0.72_0.16_264)]/10',
+      dot: 'bg-signal-indie',
+      text: 'text-signal-indie',
+      border: 'border-signal-indie/30',
+      bg: 'bg-signal-indie/10',
     },
     data: {
-      dot: 'bg-[oklch(0.75_0.15_55)]',
-      text: 'text-[oklch(0.75_0.15_55)]',
-      border: 'border-[oklch(0.75_0.15_55)]/30',
-      bg: 'bg-[oklch(0.75_0.15_55)]/10',
+      dot: 'bg-signal-data',
+      text: 'text-signal-data',
+      border: 'border-signal-data/30',
+      bg: 'bg-signal-data/10',
     },
   };
 

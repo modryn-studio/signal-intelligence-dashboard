@@ -66,7 +66,7 @@ A solo developer who knows how to build but doesn't yet know what to build. Disc
 **Visual Rules:**
 
 - Light and dark mode. Defaults to system preference. Theme toggle in the dashboard header.
-- Fonts: Space Grotesk (headlines) + Space Mono (badges, tags, code, timestamps). Currently Inter + JetBrains Mono — migration pending.
+- Fonts: Inter (body, headlines) + JetBrains Mono (badges, tags, code, timestamps).
 - Motion: Minimal. Subtle fade on load. Nothing moves unless it has to.
 - Avoid: no gradients, no blue of any shade, no decorative illustrations, no stock photos.
 - Accent green (`oklch(0.75 0.18 142)` dark / `oklch(0.52 0.18 142)` light) is the single identity color.
@@ -143,7 +143,7 @@ This project uses Tailwind CSS v4. The rules are different from v3 — follow th
   --color-muted: oklch(0.65 0 0); /* secondary text, placeholders */
   --color-surface: oklch(0.14 0 0); /* card/panel surface (dark) */
   --color-border: oklch(0.26 0 0); /* dividers, input outlines (dark) */
-  --font-heading: var(--font-sans); /* Inter — Space Grotesk migration pending */
+  --font-heading: var(--font-sans); /* Inter */
 }
 
 /* ❌ wrong — :root creates CSS variables but NO utility classes */

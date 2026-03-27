@@ -20,7 +20,7 @@ A solo developer who knows how to build but doesn’t yet know what to build. Th
 ## Visual Rules
 
 - Color mode: Light and dark mode. Defaults to system preference. Toggle available in the dashboard header.
-- Fonts: Space Grotesk (headlines) + Space Mono (badges, tags, code, timestamps). Currently implemented as Inter + JetBrains Mono — migration pending.
+- Fonts: Inter (body, headlines) + JetBrains Mono (badges, tags, code, timestamps).
 - Motion: Minimal. Subtle fade on load. Nothing that moves unless it has to.
 - Avoid: No fake testimonials, no stock photos, no popups, no gradients, no decorative illustrations.
 

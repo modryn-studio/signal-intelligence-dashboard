@@ -200,6 +200,8 @@ Shows the title (clickable if there is a URL), a source badge, a color dot for t
 
 Shows the title, body text, date, and tags.
 
+Date group headers (Today, Mar 26, etc.) are collapsible — click to collapse or expand a day. When collapsed, the header shows a count of how many observations are inside, e.g. `Mar 26 (3)`.
+
 **Hover** to see two buttons:
 
 - **✕** — delete this observation permanently
@@ -271,7 +273,7 @@ Post your answers as a comment on GitHub Issue #2:
 
 ---
 
-_Last updated: March 26, 2026_
+_Last updated: March 27, 2026_
 
 ---
 

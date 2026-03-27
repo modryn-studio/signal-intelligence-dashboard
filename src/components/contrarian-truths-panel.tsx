@@ -34,18 +34,15 @@ interface ContrarianTruth {
 const STATUS_STYLES: Record<Status, { label: string; classes: string }> = {
   forming: {
     label: 'Forming',
-    classes:
-      'text-[oklch(0.75_0.15_55)] border-[oklch(0.75_0.15_55)]/40 bg-[oklch(0.75_0.15_55)]/5',
+    classes: 'text-signal-data border-signal-data/40 bg-signal-data/5',
   },
   confident: {
     label: 'Confident',
-    classes:
-      'text-[oklch(0.75_0.18_142)] border-[oklch(0.75_0.18_142)]/40 bg-[oklch(0.75_0.18_142)]/5',
+    classes: 'text-signal-trends border-signal-trends/40 bg-signal-trends/5',
   },
   validated: {
     label: 'Validated',
-    classes:
-      'text-[oklch(0.72_0.16_264)] border-[oklch(0.72_0.16_264)]/40 bg-[oklch(0.72_0.16_264)]/5',
+    classes: 'text-signal-indie border-signal-indie/40 bg-signal-indie/5',
   },
   invalidated: {
     label: 'Invalidated',
@@ -320,24 +317,26 @@ export function ContrarianTruthsPanel() {
         ))}
       </div>
 
-      {/* The sequence reminder */}
-      <div className="border-border/50 rounded border border-dashed p-3">
-        <p className="text-muted-foreground/50 mb-1.5 font-mono text-[10px] tracking-widest uppercase">
-          The sequence
-        </p>
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground/50 font-mono text-[10px]">Inputs</span>
-          <span className="text-muted-foreground/30 font-mono text-[10px]">→</span>
-          <span className="text-muted-foreground/50 font-mono text-[10px]">Observations</span>
-          <span className="text-muted-foreground/30 font-mono text-[10px]">→</span>
-          <span className="text-primary font-mono text-[10px]">Contrarian Truth</span>
-        </div>
-      </div>
-
       {/* Truths list */}
       <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto pr-1">
         {filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+            {filter === 'active' && (!truths || truths.length === 0) && (
+              <div className="border-border/50 mb-2 w-full rounded border border-dashed p-3 text-left">
+                <p className="text-muted-foreground/50 mb-1.5 font-mono text-[10px] tracking-widest uppercase">
+                  The sequence
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground/50 font-mono text-[10px]">Inputs</span>
+                  <span className="text-muted-foreground/30 font-mono text-[10px]">→</span>
+                  <span className="text-muted-foreground/50 font-mono text-[10px]">
+                    Observations
+                  </span>
+                  <span className="text-muted-foreground/30 font-mono text-[10px]">→</span>
+                  <span className="text-primary font-mono text-[10px]">Contrarian Truth</span>
+                </div>
+              </div>
+            )}
             <p className="text-muted-foreground/70 font-mono text-xs tracking-widest uppercase">
               {filter === 'validated'
                 ? 'None validated yet'
