@@ -196,8 +196,8 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
                     className="hover:text-foreground cursor-pointer transition-colors disabled:cursor-default"
                   >
                     {CONVICTION_LABELS[truth.conviction_level]}
-                  </button>
-                  {' '}({truth.conviction_level}/5)
+                  </button>{' '}
+                  ({truth.conviction_level}/5)
                 </span>
                 {(truth.supporting_observations?.length ?? 0) > 0 && (
                   <span className="text-muted-foreground font-mono text-[10px]">
@@ -339,20 +339,25 @@ export function ContrarianTruthsPanel() {
         {filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
             <p className="text-muted-foreground/70 font-mono text-xs tracking-widest uppercase">
-              No theses yet
+              {filter === 'validated' ? 'None validated yet' : filter === 'invalidated' ? 'None invalidated' : 'No theses yet'}
             </p>
             <p className="text-muted-foreground/55 max-w-48 text-xs leading-relaxed">
-              After enough observations, what contrarian belief are you forming that most
-              haven&apos;t caught on to?
+              {filter === 'validated'
+                ? 'Validated theses have been confirmed by the market. Keep observing.'
+                : filter === 'invalidated'
+                  ? 'Invalidated theses are ones the market proved wrong. Nothing here yet.'
+                  : "After enough observations, what contrarian belief are you forming that most haven't caught on to?"}
             </p>
-            <Button
-              onClick={() => setAddModalOpen(true)}
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-foreground mt-1 font-mono text-xs"
-            >
-              + Form first thesis
-            </Button>
+            {filter === 'active' && (
+              <Button
+                onClick={() => setAddModalOpen(true)}
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-foreground mt-1 font-mono text-xs"
+              >
+                + Form first thesis
+              </Button>
+            )}
           </div>
         )}
 
