@@ -114,8 +114,9 @@ export function ObservationsPanel() {
   const grouped = useMemo(() => {
     const map = new Map<string, Observation[]>();
     for (const obs of observations ?? []) {
-      if (!map.has(obs.date)) map.set(obs.date, []);
-      map.get(obs.date)!.push(obs);
+      const dateKey = obs.date.substring(0, 10);
+      if (!map.has(dateKey)) map.set(dateKey, []);
+      map.get(dateKey)!.push(obs);
     }
     return map;
   }, [observations]);
