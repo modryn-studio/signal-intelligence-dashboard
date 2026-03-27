@@ -67,11 +67,13 @@ function EvalCard({
   onAccept,
   onDelete,
   forceAccepted = false,
+  isTopSignal = false,
 }: {
   ev: EvaluationResult;
   onAccept: (title: string, body: string) => Promise<void>;
   onDelete: () => Promise<void>;
   forceAccepted?: boolean;
+  isTopSignal?: boolean;
 }) {
   const [cardStatus, setCardStatus] = useState<CardStatus>('pending');
   const [expanded, setExpanded] = useState(ev.recommendation === 'observe');
@@ -124,11 +126,18 @@ function EvalCard({
                 <p className="text-foreground line-clamp-2 text-sm leading-snug">{ev.title}</p>
               )}
             </div>
-            <span
-              className={`shrink-0 font-mono text-[10px] tracking-wider uppercase ${style.badge}`}
-            >
-              {isAccepted ? '✓ saved' : isDeleted ? 'deleted' : style.label}
-            </span>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              {isTopSignal && (
+                <span className="text-accent border-accent/30 bg-accent/5 rounded border px-1.5 py-0.5 font-mono text-[9px] tracking-widest uppercase">
+                  top signal
+                </span>
+              )}
+              <span
+                className={`shrink-0 font-mono text-[10px] tracking-wider uppercase ${style.badge}`}
+              >
+                {isAccepted ? '✓ saved' : isDeleted ? 'deleted' : style.label}
+              </span>
+            </div>
           </div>
           <p className="text-muted-foreground mt-0.5 font-mono text-[10px]">
             {ev.source} · {ev.source_category}
@@ -561,6 +570,7 @@ export function EvaluateSignalsModal({
                   onAccept={(title, body) => handleAccept(ev, title, body)}
                   onDelete={() => handleDelete(ev)}
                   forceAccepted={acceptedFromOutside.has(ev.id)}
+                  isTopSignal={synthesis?.priority_ids?.includes(ev.id) ?? false}
                 />
               ))}
             </div>
