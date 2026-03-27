@@ -25,6 +25,7 @@ export interface EvaluationResult {
   reasoning: string;
   proposed_title?: string;
   proposed_body?: string;
+  signal_type?: 'frustration' | 'growing-fast' | 'served-poorly' | 'contrarian';
 }
 
 export interface Synthesis {
@@ -189,6 +190,7 @@ DELETE: Noise. Off-topic. A single anecdote. A solved problem with satisfied use
 For each OBSERVE signal:
 - proposed_title: 10 words max. Name the gap at the intersection — what's growing, what's failing it.
 - proposed_body: 2 sentences. Sentence 1: the growth evidence (cite something specific from source — numbers, engagement, scale, spreading behavior). Sentence 2: the service failure (what exists, why it doesn't fit, what people do instead). No assertions you cannot confirm from the source content.
+- signal_type: the single dominant driver. Pick exactly one: "frustration" (primary evidence is pain/complaints), "growing-fast" (primary evidence is adoption/scale), "served-poorly" (primary evidence is solution failure/no dominant player), "contrarian" (the signal flips conventional wisdom about the market). Choose the one that is most clearly evidenced in the source.
 
 For signals where source_content is empty: use web_search on the title before deciding.
 
@@ -208,7 +210,7 @@ Synthesize ONLY the observe-rated signals. One sentence per field. No hedging.
 Use web_search once during synthesis only if you need to confirm whether a dominant solution already exists.
 
 Respond with ONLY valid JSON, no markdown:
-{"evaluations":[{"ref":1,"recommendation":"observe","reasoning":"one sentence citing specific growth + service-failure evidence","proposed_title":"...","proposed_body":"..."},{"ref":2,"recommendation":"skip","reasoning":"one sentence"}],"synthesis":{"priority_ids":[1,3],"priority":"...","patterns":"...","thesis_candidate":"..."}}`;
+{"evaluations":[{"ref":1,"recommendation":"observe","reasoning":"one sentence citing specific growth + service-failure evidence","proposed_title":"...","proposed_body":"...","signal_type":"frustration"},{"ref":2,"recommendation":"skip","reasoning":"one sentence"}],"synthesis":{"priority_ids":[1,3],"priority":"...","patterns":"...","thesis_candidate":"..."}}`;
 
     log.info(ctx.reqId, 'Calling Claude for signal evaluation');
 
@@ -245,6 +247,7 @@ Respond with ONLY valid JSON, no markdown:
         reasoning: string;
         proposed_title?: string;
         proposed_body?: string;
+        signal_type?: string;
       }>;
       synthesis?: Synthesis;
     };
@@ -263,6 +266,7 @@ Respond with ONLY valid JSON, no markdown:
         reasoning: e.reasoning,
         proposed_title: e.proposed_title,
         proposed_body: e.proposed_body,
+        signal_type: e.signal_type as EvaluationResult['signal_type'] ?? undefined,
       };
     });
 

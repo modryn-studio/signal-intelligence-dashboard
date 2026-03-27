@@ -357,7 +357,7 @@ export function EvaluateSignalsModal({
           title: ev.proposed_title,
           body: ev.proposed_body,
           related_input_ids: [ev.id],
-          tags: [ev.source_category],
+          tags: ev.signal_type ? [ev.signal_type] : [],
         }),
       });
       if (res.ok) {
@@ -401,7 +401,7 @@ export function EvaluateSignalsModal({
         title,
         body,
         related_input_ids: [ev.id],
-        tags: [ev.source_category],
+        tags: ev.signal_type ? [ev.signal_type] : [],
       }),
     });
     onObservationSaved();
