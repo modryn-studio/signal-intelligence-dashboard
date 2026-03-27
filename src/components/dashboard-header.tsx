@@ -124,10 +124,11 @@ export function DashboardHeader() {
               <StreakDots streak={stats?.recent_streak || []} />
             </div>
             <button
-              onClick={() => setDigestOpen(true)}
-              className="border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground flex items-center gap-2 rounded border px-3 py-1.5 font-mono text-xs transition-colors"
+              disabled
+              title="Coming soon"
+              className="border-border text-muted-foreground/40 flex cursor-not-allowed items-center gap-2 rounded border px-3 py-1.5 font-mono text-xs"
             >
-              <span className="bg-primary h-1.5 w-1.5 animate-pulse rounded-full" />
+              <span className="bg-muted-foreground/30 h-1.5 w-1.5 rounded-full" />
               Digest
             </button>
             <button
