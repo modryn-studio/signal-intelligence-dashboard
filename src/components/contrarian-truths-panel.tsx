@@ -64,6 +64,7 @@ const CONVICTION_LABELS: Record<number, string> = {
 function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () => void }) {
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
   const styles = STATUS_STYLES[truth.status];
 
   const nextStatus: Record<Status, Status> = {
@@ -103,6 +104,24 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
   };
 
   return (
+    <>
+    <AlertDialog open={advanceDialogOpen} onOpenChange={setAdvanceDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Advance this thesis?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Move from <strong>{STATUS_STYLES[truth.status].label}</strong> to{' '}
+            <strong>{STATUS_STYLES[nextStatus[truth.status]].label}</strong>. This records your growing conviction.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleAdvance} disabled={updating}>
+            Advance
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <AlertDialog>
     <div
       className={`group relative rounded border p-3 transition-colors ${styles.classes} ${truth.status === 'invalidated' ? 'opacity-40' : ''}`}
@@ -152,7 +171,7 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
             <div className="mt-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
               {truth.status !== 'validated' && (
                 <button
-                  onClick={handleAdvance}
+                  onClick={() => setAdvanceDialogOpen(true)}
                   disabled={updating}
                   className="text-muted-foreground hover:text-foreground border-border hover:border-muted-foreground rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
                 >
@@ -195,6 +214,7 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+    </>
   );
 }
 
