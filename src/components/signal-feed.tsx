@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDownIcon } from 'lucide-react';
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { AddInputModal } from '@/components/add-input-modal';
 import { AddObservationModal } from '@/components/add-observation-modal';
 import { AgentRunModal } from '@/components/agent-run-modal';
@@ -189,6 +189,8 @@ function InputCard({
 
 export function SignalFeed() {
   const today = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState(today);
+  const isToday = selectedDate === today;
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addCategory, setAddCategory] = useState<Category>('trends');
@@ -210,10 +212,17 @@ export function SignalFeed() {
     setObserveModalOpen(true);
   };
 
+  const shiftDay = (delta: number) => {
+    const d = new Date(selectedDate + 'T12:00:00');
+    d.setDate(d.getDate() + delta);
+    const next = d.toISOString().split('T')[0];
+    if (next <= today) setSelectedDate(next);
+  };
+
   const url =
     activeCategory === 'all'
-      ? `/api/inputs?date=${today}`
-      : `/api/inputs?date=${today}&category=${activeCategory}`;
+      ? `/api/inputs?date=${selectedDate}`
+      : `/api/inputs?date=${selectedDate}&category=${activeCategory}`;
 
   const { data: inputs, mutate } = useSWR<SignalInput[]>(url, fetcher, { refreshInterval: 30000 });
 
@@ -250,9 +259,28 @@ export function SignalFeed() {
           <h2 className="text-muted-foreground font-mono text-xs tracking-widest uppercase">
             Signal Inputs
           </h2>
-          <p className="text-muted-foreground/60 mt-0.5 text-xs">
-            {inputs?.length || 0} captured today
-          </p>
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <button
+              onClick={() => shiftDay(-1)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Previous day"
+            >
+              <ChevronLeftIcon className="h-3 w-3" />
+            </button>
+            <p className="text-muted-foreground/60 text-xs">
+              {isToday
+                ? `${inputs?.length || 0} captured today`
+                : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </p>
+            <button
+              onClick={() => shiftDay(1)}
+              disabled={isToday}
+              className="text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+              aria-label="Next day"
+            >
+              <ChevronRightIcon className="h-3 w-3" />
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <DropdownMenu>
@@ -275,7 +303,7 @@ export function SignalFeed() {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onSelect={() => setEvaluateModalOpen(true)}
-                disabled={!inputs || inputs.length === 0}
+                disabled={!inputs || inputs.length === 0 || !isToday}
                 className="font-mono text-xs"
               >
                 Deep Evaluate
@@ -284,8 +312,9 @@ export function SignalFeed() {
           </DropdownMenu>
           <Button
             onClick={() => openAdd()}
+            disabled={!isToday}
             size="sm"
-            className="bg-primary text-primary-foreground h-7 px-3 font-mono text-xs tracking-wider"
+            className="bg-primary text-primary-foreground h-7 px-3 font-mono text-xs tracking-wider disabled:opacity-40"
           >
             + Log Input
           </Button>
@@ -362,20 +391,24 @@ export function SignalFeed() {
         {(!inputs || inputs.length === 0) && (
           <div className="border-border flex flex-col items-center justify-center gap-3 rounded border border-dashed py-12 text-center">
             <p className="text-muted-foreground/75 font-mono text-xs tracking-widest uppercase">
-              No inputs yet today
+              {isToday ? 'No inputs yet today' : 'No inputs on this day'}
             </p>
-            <p className="text-muted-foreground/60 max-w-48 text-xs leading-relaxed">
-              Start consuming with the question: &ldquo;Where is something growing fast but being
-              served poorly?&rdquo;
-            </p>
-            <Button
-              onClick={() => openAdd()}
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-foreground mt-1 font-mono text-xs"
-            >
-              + Log your first signal
-            </Button>
+            {isToday && (
+              <>
+                <p className="text-muted-foreground/60 max-w-48 text-xs leading-relaxed">
+                  Start consuming with the question: &ldquo;Where is something growing fast but
+                  being served poorly?&rdquo;
+                </p>
+                <Button
+                  onClick={() => openAdd()}
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground mt-1 font-mono text-xs"
+                >
+                  + Log your first signal
+                </Button>
+              </>
+            )}
           </div>
         )}
 
@@ -393,12 +426,14 @@ export function SignalFeed() {
                     <span className="text-muted-foreground font-mono text-[10px]">
                       ({grouped[cat].length})
                     </span>
+                    {isToday && (
                     <button
                       onClick={() => openAdd(cat)}
                       className={`ml-auto font-mono text-[10px] ${CATEGORY_STYLES[cat].text} opacity-60 hover:opacity-100`}
                     >
                       + add
                     </button>
+                    )}
                   </div>
                   {grouped[cat].map((input) => (
                     <InputCard
