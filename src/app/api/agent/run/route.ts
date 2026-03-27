@@ -2,17 +2,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { sql } from '@/lib/db';
 import { createRouteLogger } from '@/lib/route-logger';
 
-const log = createRouteLogger('agent-run');
+import { getTodayQuestion } from '@/lib/utils';
 
-const DAILY_QUESTIONS = [
-  'Where is something growing fast but being served poorly?',
-  'What do people keep complaining about that no one has fixed?',
-  'Which market is 10x bigger than people think it is?',
-  'What belief do most people in this space hold that is wrong?',
-  'Where is the gap between what people pay for and what they actually need?',
-  'What would you build if you knew this trend continued for 5 more years?',
-  'Which problem keeps appearing in multiple places at once?',
-];
+const log = createRouteLogger('agent-run');
 
 type SourceCategory = 'trends' | 'complaints' | 'indie' | 'data';
 

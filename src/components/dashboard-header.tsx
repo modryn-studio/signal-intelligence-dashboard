@@ -16,15 +16,7 @@ interface Stats {
   recent_streak: { date: string; count: number }[];
 }
 
-const DAILY_QUESTIONS = [
-  'Where is something growing fast but being served poorly?',
-  'What do people keep complaining about that no one has fixed?',
-  'Which market is 10x bigger than people think it is?',
-  'What belief do most people in this space hold that is wrong?',
-  'Where is the gap between what people pay for and what they actually need?',
-  'What would you build if you knew this trend continued for 5 more years?',
-  'Which problem keeps appearing in multiple places at once?',
-];
+import { getTodayQuestion } from '@/lib/utils';
 
 function StreakDots({ streak }: { streak: { date: string; count: number }[] }) {
   const today = new Date();
@@ -71,10 +63,7 @@ export function DashboardHeader() {
   });
 
   // Deterministic daily question based on day of year
-  const dayOfYear = Math.floor(
-    (today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000
-  );
-  const question = DAILY_QUESTIONS[dayOfYear % DAILY_QUESTIONS.length];
+  const question = getTodayQuestion();
 
   return (
     <>
