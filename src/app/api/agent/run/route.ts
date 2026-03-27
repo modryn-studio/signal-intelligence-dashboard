@@ -89,7 +89,7 @@ async function fetchProductHunt(): Promise<FetchedItem[]> {
       title: `${node.name} — ${node.tagline}`,
       url: node.url,
       source: 'Product Hunt',
-      defaultCategory: 'indie' as SourceCategory,
+      defaultCategory: 'trends' as SourceCategory,
       score: node.votesCount,
     }));
   } catch {
