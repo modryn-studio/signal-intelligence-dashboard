@@ -220,6 +220,7 @@ interface CacheEntry {
   evaluations: EvaluationResult[];
   question: string;
   synthesis: Synthesis | null;
+  accepted?: boolean;
 }
 
 function getTodayCacheKey() {
@@ -276,6 +277,7 @@ export function EvaluateSignalsModal({
         setQuestion(cached.question);
         setSynthesis(cached.synthesis);
         setIsDone(true);
+        if (cached.accepted) setPriorityAccepted(true);
         return;
       }
     }
@@ -378,6 +380,13 @@ export function EvaluateSignalsModal({
     setAcceptedFromOutside(new Set(synthesis.priority_ids));
     setPriorityAccepted(true);
     setPriorityAccepting(false);
+    // Persist accepted state so page refresh doesn't re-enable the button
+    try {
+      const existing = readCache();
+      if (existing) writeCache({ ...existing, accepted: true });
+    } catch {
+      // ignore
+    }
     // Wake up both panels immediately — don't wait for their 30s/60s poll intervals
     void globalMutate('/api/observations?limit=20');
     void globalMutate('/api/truths');
