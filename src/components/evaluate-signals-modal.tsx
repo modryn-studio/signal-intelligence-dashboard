@@ -372,7 +372,7 @@ export function EvaluateSignalsModal({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         thesis: synthesis.thesis_candidate,
-        conviction_level: 1,
+        conviction_level: 2, // Claude identified priority signals — worth leaning on immediately
         status: 'forming',
         supporting_observations: obsIds,
       }),
