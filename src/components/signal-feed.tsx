@@ -192,6 +192,7 @@ export function SignalFeed() {
   const [selectedDate, setSelectedDate] = useState(today);
   const isToday = selectedDate === today;
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
+  const todayQuestion = getTodayQuestion();
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addCategory, setAddCategory] = useState<Category>('trends');
   const [agentModalOpen, setAgentModalOpen] = useState(false);
@@ -397,8 +398,7 @@ export function SignalFeed() {
             {isToday && (
               <>
                 <p className="text-muted-foreground/60 max-w-48 text-xs leading-relaxed">
-                  Start consuming with the question: &ldquo;Where is something growing fast but
-                  being served poorly?&rdquo;
+                  Start consuming with the question: &ldquo;{todayQuestion}&rdquo;
                 </p>
                 <Button
                   onClick={() => openAdd()}
