@@ -24,7 +24,7 @@ function StreakDots({ streak }: { streak: { date: string; count: number }[] }) {
     const d = new Date(today);
     d.setDate(d.getDate() - (13 - i));
     const dateStr = d.toISOString().split('T')[0];
-    const entry = streak.find((s) => s.date === dateStr);
+    const entry = streak.find((s) => s.date.substring(0, 10) === dateStr);
     return { dateStr, count: entry?.count || 0 };
   });
 
