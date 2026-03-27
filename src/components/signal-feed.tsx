@@ -296,6 +296,7 @@ export function SignalFeed() {
             <DropdownMenuContent align="end" className="font-mono text-xs">
               <DropdownMenuItem
                 onSelect={() => setAgentModalOpen(true)}
+                disabled={!isToday}
                 className="font-mono text-xs"
               >
                 Run Agent
