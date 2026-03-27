@@ -65,6 +65,7 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
+  const [invalidateDialogOpen, setInvalidateDialogOpen] = useState(false);
   const styles = STATUS_STYLES[truth.status];
 
   const nextStatus: Record<Status, Status> = {
@@ -105,115 +106,132 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
 
   return (
     <>
-    <AlertDialog open={advanceDialogOpen} onOpenChange={setAdvanceDialogOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Advance this thesis?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Move from <strong>{STATUS_STYLES[truth.status].label}</strong> to{' '}
-            <strong>{STATUS_STYLES[nextStatus[truth.status]].label}</strong>. This records your growing conviction.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleAdvance} disabled={updating}>
-            Advance
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-    <AlertDialog>
-    <div
-      className={`group relative rounded border p-3 transition-colors ${styles.classes} ${truth.status === 'invalidated' ? 'opacity-40' : ''}`}
-    >
-      <div className="flex items-start gap-2">
-        {/* Conviction pips */}
-        <div className="mt-1 flex shrink-0 flex-col gap-0.5">
-          {[5, 4, 3, 2, 1].map((n) => (
-            <span
-              key={n}
-              className={`h-1 w-1 rounded-full transition-colors ${
-                n <= truth.conviction_level ? 'bg-current opacity-90' : 'bg-current opacity-15'
-              }`}
-            />
-          ))}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <p className="text-foreground text-sm leading-snug italic">
-            &ldquo;{truth.thesis}&rdquo;
-          </p>
-
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded border px-1.5 py-0.5 font-mono text-[10px] ${styles.classes}`}
-            >
-              {styles.label}
-            </span>
-            <span className="text-muted-foreground font-mono text-[10px]">
-              {CONVICTION_LABELS[truth.conviction_level]} ({truth.conviction_level}/5)
-            </span>
-            {(truth.supporting_observations?.length ?? 0) > 0 && (
-              <span className="text-muted-foreground font-mono text-[10px]">
-                &middot; {truth.supporting_observations.length} obs
-              </span>
-            )}
-            <span className="text-muted-foreground ml-auto font-mono text-[10px]">
-              {new Date(truth.created_at).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-              })}
-            </span>
-          </div>
-
-          {/* Actions — shown on hover */}
-          {truth.status !== 'invalidated' && (
-            <div className="mt-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-              {truth.status !== 'validated' && (
-                <button
-                  onClick={() => setAdvanceDialogOpen(true)}
-                  disabled={updating}
-                  className="text-muted-foreground hover:text-foreground border-border hover:border-muted-foreground rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
-                >
-                  Advance →
-                </button>
-              )}
-              <button
-                onClick={handleInvalidate}
-                disabled={updating}
-                className="text-muted-foreground hover:text-destructive-foreground border-border rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
-              >
-                Invalidate
-              </button>
-              <AlertDialogTrigger asChild>
-                <button
-                  disabled={deleting}
-                  className="text-muted-foreground hover:text-destructive-foreground ml-auto font-mono text-[10px] transition-colors"
-                  aria-label="Delete thesis"
-                >
-                  ✕
-                </button>
-              </AlertDialogTrigger>
+      <AlertDialog open={advanceDialogOpen} onOpenChange={setAdvanceDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Advance this thesis?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Move from <strong>{STATUS_STYLES[truth.status].label}</strong> to{' '}
+              <strong>{STATUS_STYLES[nextStatus[truth.status]].label}</strong>. This records your
+              growing conviction.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleAdvance} disabled={updating}>
+              Advance
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={invalidateDialogOpen} onOpenChange={setInvalidateDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Invalidate this thesis?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Mark this thesis as disproven. It will be moved to the Invalidated archive.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleInvalidate} disabled={updating}>
+              Invalidate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog>
+        <div
+          className={`group relative rounded border p-3 transition-colors ${styles.classes} ${truth.status === 'invalidated' ? 'opacity-40' : ''}`}
+        >
+          <div className="flex items-start gap-2">
+            {/* Conviction pips */}
+            <div className="mt-1 flex shrink-0 flex-col gap-0.5">
+              {[5, 4, 3, 2, 1].map((n) => (
+                <span
+                  key={n}
+                  className={`h-1 w-1 rounded-full transition-colors ${
+                    n <= truth.conviction_level ? 'bg-current opacity-90' : 'bg-current opacity-15'
+                  }`}
+                />
+              ))}
             </div>
-          )}
+
+            <div className="min-w-0 flex-1">
+              <p className="text-foreground text-sm leading-snug italic">
+                &ldquo;{truth.thesis}&rdquo;
+              </p>
+
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span
+                  className={`rounded border px-1.5 py-0.5 font-mono text-[10px] ${styles.classes}`}
+                >
+                  {styles.label}
+                </span>
+                <span className="text-muted-foreground font-mono text-[10px]">
+                  {CONVICTION_LABELS[truth.conviction_level]} ({truth.conviction_level}/5)
+                </span>
+                {(truth.supporting_observations?.length ?? 0) > 0 && (
+                  <span className="text-muted-foreground font-mono text-[10px]">
+                    &middot; {truth.supporting_observations.length} obs
+                  </span>
+                )}
+                <span className="text-muted-foreground ml-auto font-mono text-[10px]">
+                  {new Date(truth.created_at).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </span>
+              </div>
+
+              {/* Actions — shown on hover */}
+              {truth.status !== 'invalidated' && (
+                <div className="mt-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                  {truth.status !== 'validated' && (
+                    <button
+                      onClick={() => setAdvanceDialogOpen(true)}
+                      disabled={updating}
+                      className="text-muted-foreground hover:text-foreground border-border hover:border-muted-foreground rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
+                    >
+                      Advance →
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setInvalidateDialogOpen(true)}
+                    disabled={updating}
+                    className="text-muted-foreground hover:text-destructive-foreground border-border rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
+                  >
+                    Invalidate
+                  </button>
+                  <AlertDialogTrigger asChild>
+                    <button
+                      disabled={deleting}
+                      className="text-muted-foreground hover:text-destructive-foreground ml-auto font-mono text-[10px] transition-colors"
+                      aria-label="Delete thesis"
+                    >
+                      ✕
+                    </button>
+                  </AlertDialogTrigger>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete this thesis?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This thesis and all its conviction history will be permanently removed.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDelete} disabled={deleting}>
-            Delete
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this thesis?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This thesis and all its conviction history will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
