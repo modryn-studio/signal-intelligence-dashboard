@@ -23,14 +23,6 @@ interface ClaudeSelected {
   note: string;
 }
 
-function getTodayQuestion(): string {
-  const today = new Date();
-  const dayOfYear = Math.floor(
-    (today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000
-  );
-  return DAILY_QUESTIONS[dayOfYear % DAILY_QUESTIONS.length];
-}
-
 async function fetchHN(): Promise<FetchedItem[]> {
   const yesterday = Math.floor(Date.now() / 1000) - 86400;
   try {
