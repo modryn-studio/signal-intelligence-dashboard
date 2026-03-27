@@ -40,46 +40,46 @@ function ObservationCard({
 
   return (
     <AlertDialog>
-    <div className="group border-primary/50 hover:border-primary relative border-l-2 py-2 pl-3 transition-colors">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-foreground text-sm leading-snug font-medium">{obs.title}</p>
-          <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{obs.body}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="text-muted-foreground/50 font-mono text-[10px]">
-              {new Date(obs.created_at).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-              })}
-            </span>
-            {obs.tags?.map((tag) => (
-              <span key={tag} className="text-muted-foreground font-mono text-[10px]">
-                #{tag}
+      <div className="group border-primary/50 hover:border-primary relative border-l-2 py-2 pl-3 transition-colors">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-foreground text-sm leading-snug font-medium">{obs.title}</p>
+            <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{obs.body}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="text-muted-foreground/50 font-mono text-[10px]">
+                {new Date(obs.created_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                })}
               </span>
-            ))}
-          </div>
+              {obs.tags?.map((tag) => (
+                <span key={tag} className="text-muted-foreground font-mono text-[10px]">
+                  #{tag}
+                </span>
+              ))}
+            </div>
 
-          {/* Actions – shown on hover */}
-          <div className="mt-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-            <button
-              onClick={() => onAddToThesis(obs.id)}
-              className="text-muted-foreground hover:text-foreground border-border hover:border-muted-foreground rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
-            >
-              &rarr; Add to thesis
-            </button>
+            {/* Actions – shown on hover */}
+            <div className="mt-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+              <button
+                onClick={() => onAddToThesis(obs.id)}
+                className="text-muted-foreground hover:text-foreground border-border hover:border-muted-foreground rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
+              >
+                &rarr; Add to thesis
+              </button>
+            </div>
           </div>
+          <AlertDialogTrigger asChild>
+            <button
+              disabled={deleting}
+              className="text-muted-foreground hover:text-destructive-foreground mt-0.5 shrink-0 text-xs opacity-0 transition-all group-hover:opacity-100"
+              aria-label="Delete observation"
+            >
+              ✕
+            </button>
+          </AlertDialogTrigger>
         </div>
-        <AlertDialogTrigger asChild>
-          <button
-            disabled={deleting}
-            className="text-muted-foreground hover:text-destructive-foreground mt-0.5 shrink-0 text-xs opacity-0 transition-all group-hover:opacity-100"
-            aria-label="Delete observation"
-          >
-            ✕
-          </button>
-        </AlertDialogTrigger>
       </div>
-    </div>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete this observation?</AlertDialogTitle>
@@ -209,7 +209,7 @@ export function ObservationsPanel() {
                       })}
                 </p>
                 {!collapsedDates.has(date) && (
-                  <p className="text-muted-foreground/35 mt-0.5 text-[10px] italic leading-snug">
+                  <p className="text-muted-foreground/35 mt-0.5 text-[10px] leading-snug italic">
                     &ldquo;{getQuestionForDate(date)}&rdquo;
                   </p>
                 )}

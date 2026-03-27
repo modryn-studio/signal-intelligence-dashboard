@@ -193,9 +193,8 @@ export function SignalFeed() {
     setObservePrefill({
       body: input.title,
       relatedInputIds: [input.id],
-      // Claude's insight note → suggested title; category → seed tag
+      // Claude's insight note → suggested title
       title: input.notes ?? undefined,
-      tags: input.source_category,
     });
     setObserveModalOpen(true);
   };

@@ -339,7 +339,11 @@ export function ContrarianTruthsPanel() {
         {filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
             <p className="text-muted-foreground/70 font-mono text-xs tracking-widest uppercase">
-              {filter === 'validated' ? 'None validated yet' : filter === 'invalidated' ? 'None invalidated' : 'No theses yet'}
+              {filter === 'validated'
+                ? 'None validated yet'
+                : filter === 'invalidated'
+                  ? 'None invalidated'
+                  : 'No theses yet'}
             </p>
             <p className="text-muted-foreground/55 max-w-48 text-xs leading-relaxed">
               {filter === 'validated'

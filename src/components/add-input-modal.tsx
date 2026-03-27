@@ -175,8 +175,6 @@ export function AddInputModal({
             />
           </div>
 
-
-
           {error && <p className="text-destructive-foreground text-xs">{error}</p>}
 
           <div className="flex justify-end gap-2 pt-1">

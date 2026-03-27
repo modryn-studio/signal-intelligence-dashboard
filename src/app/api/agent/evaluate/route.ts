@@ -266,7 +266,7 @@ Respond with ONLY valid JSON, no markdown:
         reasoning: e.reasoning,
         proposed_title: e.proposed_title,
         proposed_body: e.proposed_body,
-        signal_type: e.signal_type as EvaluationResult['signal_type'] ?? undefined,
+        signal_type: (e.signal_type as EvaluationResult['signal_type']) ?? undefined,
       };
     });
 

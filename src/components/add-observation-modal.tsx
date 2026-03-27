@@ -7,11 +7,17 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 
+const SIGNAL_TYPES = [
+  { key: 'frustration', label: 'Frustration' },
+  { key: 'growing-fast', label: 'Growing fast' },
+  { key: 'served-poorly', label: 'Served poorly' },
+  { key: 'contrarian', label: 'Contrarian' },
+] as const;
+
 interface Prefill {
   body: string;
   relatedInputIds: number[];
   title?: string;
-  tags?: string;
 }
 
 interface AddObservationModalProps {
@@ -24,7 +30,7 @@ interface AddObservationModalProps {
 export function AddObservationModal({ open, onClose, onSaved, prefill }: AddObservationModalProps) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [tags, setTags] = useState('');
+  const [signalTypes, setSignalTypes] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -33,10 +39,14 @@ export function AddObservationModal({ open, onClose, onSaved, prefill }: AddObse
     if (open) {
       setTitle(prefill?.title ?? '');
       setBody(prefill?.body ?? '');
-      setTags(prefill?.tags ?? '');
+      setSignalTypes([]);
       setError('');
     }
-  }, [open, prefill?.title, prefill?.body, prefill?.tags]);
+  }, [open, prefill?.title, prefill?.body]);
+
+  const toggleSignalType = (key: string) => {
+    setSignalTypes((prev) => (prev.includes(key) ? prev.filter((t) => t !== key) : [...prev, key]));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,16 +64,13 @@ export function AddObservationModal({ open, onClose, onSaved, prefill }: AddObse
           title: title.trim(),
           body: body.trim(),
           related_input_ids: prefill?.relatedInputIds ?? [],
-          tags: tags
-            .split(',')
-            .map((t) => t.trim())
-            .filter(Boolean),
+          tags: signalTypes,
         }),
       });
       if (!res.ok) throw new Error('Failed to save');
       setTitle('');
       setBody('');
-      setTags('');
+      setSignalTypes([]);
       onSaved();
       onClose();
     } catch {
@@ -113,17 +120,30 @@ export function AddObservationModal({ open, onClose, onSaved, prefill }: AddObse
             />
           </div>
 
-          {/* Tags */}
+          {/* Signal type */}
           <div className="flex flex-col gap-1.5">
             <Label className="text-muted-foreground font-mono text-xs tracking-wider uppercase">
-              Tags (comma-separated)
+              Signal type
             </Label>
-            <Input
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder="onboarding, b2b, saas"
-              className="bg-input border-border text-sm"
-            />
+            <div className="flex flex-wrap gap-2">
+              {SIGNAL_TYPES.map(({ key, label }) => {
+                const active = signalTypes.includes(key);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleSignalType(key)}
+                    className={`rounded border px-2.5 py-1 font-mono text-xs transition-colors ${
+                      active
+                        ? 'border-accent bg-accent/10 text-accent'
+                        : 'border-border text-muted-foreground hover:border-accent/40 hover:text-foreground'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {error && <p className="text-destructive-foreground text-xs">{error}</p>}
