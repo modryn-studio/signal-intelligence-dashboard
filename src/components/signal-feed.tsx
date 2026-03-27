@@ -30,6 +30,11 @@ import {
 } from '@/components/ui/alert-dialog';
 import { getTodayQuestion } from '@/lib/utils';
 
+// Must match the cache key used in evaluate-signals-modal.tsx
+function getTodayEvalCacheKey() {
+  return 'signal-eval-' + new Date().toISOString().split('T')[0];
+}
+
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 type Category = keyof typeof SOURCE_CATEGORIES;
@@ -177,6 +182,7 @@ export function SignalFeed() {
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
   const todayQuestion = getTodayQuestion();
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [evalPrewarming, setEvalPrewarming] = useState(false);
   const [addCategory, setAddCategory] = useState<Category>('trends');
   const [agentModalOpen, setAgentModalOpen] = useState(false);
   const [evaluateModalOpen, setEvaluateModalOpen] = useState(false);
@@ -220,6 +226,26 @@ export function SignalFeed() {
     if (!res.ok) throw new Error('Failed');
     const data = (await res.json()) as { logged: number };
     mutate();
+    if (data.logged > 0) {
+      // Pre-warm the evaluate cache so Deep Evaluate is fast (or instant) when opened
+      try {
+        if (!localStorage.getItem(getTodayEvalCacheKey())) {
+          setEvalPrewarming(true);
+          fetch('/api/agent/evaluate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          })
+            .then(async (r) => {
+              if (!r.ok) return;
+              const entry = await r.json();
+              try { localStorage.setItem(getTodayEvalCacheKey(), JSON.stringify(entry)); } catch { /* quota */ }
+            })
+            .catch(() => { /* silent fail */ })
+            .finally(() => setEvalPrewarming(false));
+        }
+      } catch { /* localStorage unavailable */ }
+    }
     return data;
   };
 
@@ -459,6 +485,7 @@ export function SignalFeed() {
         onClose={() => setAgentModalOpen(false)}
         onRun={runAgent}
         onDeepEvaluate={() => setEvaluateModalOpen(true)}
+        isPrewarming={evalPrewarming}
       />
 
       <EvaluateSignalsModal

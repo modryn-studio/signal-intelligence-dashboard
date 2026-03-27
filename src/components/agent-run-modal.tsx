@@ -57,9 +57,10 @@ interface Props {
   onClose: () => void;
   onRun: () => Promise<{ logged: number }>;
   onDeepEvaluate?: () => void;
+  isPrewarming?: boolean;
 }
 
-export function AgentRunModal({ open, question, onClose, onRun, onDeepEvaluate }: Props) {
+export function AgentRunModal({ open, question, onClose, onRun, onDeepEvaluate, isPrewarming }: Props) {
   const [stepIndex, setStepIndex] = useState(0); // which step is currently active
   const [result, setResult] = useState<{ logged: number } | null>(null);
   const [error, setError] = useState(false);
@@ -146,6 +147,9 @@ export function AgentRunModal({ open, question, onClose, onRun, onDeepEvaluate }
                   size="sm"
                   className="w-full font-mono text-xs tracking-wider"
                 >
+                  {isPrewarming && (
+                    <span className="bg-primary/70 mr-1.5 h-1.5 w-1.5 animate-pulse rounded-full inline-block" />
+                  )}
                   &rarr; Deep evaluate
                 </Button>
               )}
