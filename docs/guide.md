@@ -16,6 +16,8 @@ The flow goes left to right. A signal becomes an observation. An observation bec
 
 At the top of the page there is a question in italics — today's focus. Everything you do should be filtered through that question.
 
+**On mobile:** the three columns are stacked. A tab bar at the bottom of the screen lets you switch between **Signals**, **Observe**, and **Theses**. Everything else works the same way.
+
 ---
 
 ## The daily routine
@@ -189,7 +191,7 @@ After 3–5 days, these numbers tell you exactly where the system is getting stu
 
 Shows the title (clickable if there is a URL), a source badge, a color dot for the category, tags, the timestamp, and your notes.
 
-**Hover** to see two buttons:
+**On desktop, hover** to see two buttons. **On mobile, they are always visible:**
 
 - **✕** — delete this card permanently
 - **→ Observe** — open the observation form pre-filled with this signal
@@ -202,7 +204,7 @@ Shows the title, body text, date, and tags.
 
 Date group headers (Today, Mar 26, etc.) are collapsible — click to collapse or expand a day. When collapsed, the header shows a count of how many observations are inside, e.g. `Mar 26 (3)`.
 
-**Hover** to see two buttons:
+**On desktop, hover** to see two buttons. **On mobile, they are always visible:**
 
 - **✕** — delete this observation permanently
 - **→ Add to thesis** — open the thesis picker
@@ -213,7 +215,7 @@ Date group headers (Today, Mar 26, etc.) are collapsible — click to collapse o
 
 Shows the thesis text in quotes, a status badge (Forming / Confident / Validated / Invalidated), a conviction label (Hunch → Lean → Believe → Confident → Certain), a count of attached observations, and five dots filled to conviction level.
 
-**Hover** to see:
+**On desktop, hover** to see. **On mobile, always visible:**
 
 - **Advance →** — moves status forward: Forming → Confident → Validated
 - **Invalidate** — marks it wrong. Keeps it in the record so you can learn from it.
@@ -274,11 +276,3 @@ Post your answers as a comment on GitHub Issue #2:
 ---
 
 _Last updated: March 27, 2026_
-
----
-
-<!-- Sync to modryn-studio-v2 (strips internal sections before publishing):
-node -e "const fs=require('fs');const g=fs.readFileSync('docs/guide.md','utf8');const cut=g.indexOf('\n---\n\n## After 3');const p='C:/Users/Luke/Documents/Dev/modryn-studio-v2/content/tools/signal-intelligence.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j.guide=g.slice(0,cut).trimEnd();fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n','utf8');"
-Then commit + push in modryn-studio-v2.
-NOTE: Sections below ("After 3-5 days" and "What is and is not working") are internal only — not published.
--->

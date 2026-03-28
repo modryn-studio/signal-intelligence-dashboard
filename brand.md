@@ -58,19 +58,19 @@ All tokens are defined in `src/app/globals.css`. Light and dark mode are separat
 
 **Dark mode** — neutral graphite. Pure achromatic surfaces (zero chroma) so the burnt orange primary and signal category colors read with maximum punch. Never warm-tinted dark. Never pure black. Depth order: `--column-flank` (darkest) → `--background` → `--card` (lightest).
 
-| Token                | Value               | Role                                                    |
-| -------------------- | ------------------- | ------------------------------------------------------- |
-| `--background`       | oklch(0.16 0 0)     | Header + center column — dark graphite                  |
-| `--card`             | oklch(0.21 0 0)     | Elevated card/panel surfaces                            |
-| `--muted`            | oklch(0.24 0 0)     | Hover surfaces — slightly above card                    |
-| `--column-flank`     | oklch(0.12 0 0)     | Left + right columns — darkest layer, recessed          |
-| `--foreground`       | oklch(0.95 0 0)     | Near-white body text — high contrast                    |
-| `--primary`          | oklch(0.62 0.14 38) | Burnt orange — same hue as light, raised luminance      |
-| `--muted-foreground` | oklch(0.60 0 0)     | Timestamps, labels — neutral mid-gray                   |
-| `--border`           | oklch(0.26 0 0)     | Dividers, input outlines                                |
-| `--secondary`        | oklch(0.25 0 0)     | Subtle elevated surface (inactive tabs, etc.)           |
-| `--destructive`      | oklch(0.58 0.18 18) | Errors and delete actions — lightened for dark bg       |
-| `--success`          | oklch(0.58 0.14 145)| Same hue shift as primary — lightened                   |
+| Token                | Value                | Role                                               |
+| -------------------- | -------------------- | -------------------------------------------------- |
+| `--background`       | oklch(0.16 0 0)      | Header + center column — dark graphite             |
+| `--card`             | oklch(0.21 0 0)      | Elevated card/panel surfaces                       |
+| `--muted`            | oklch(0.24 0 0)      | Hover surfaces — slightly above card               |
+| `--column-flank`     | oklch(0.12 0 0)      | Left + right columns — darkest layer, recessed     |
+| `--foreground`       | oklch(0.95 0 0)      | Near-white body text — high contrast               |
+| `--primary`          | oklch(0.62 0.14 38)  | Burnt orange — same hue as light, raised luminance |
+| `--muted-foreground` | oklch(0.60 0 0)      | Timestamps, labels — neutral mid-gray              |
+| `--border`           | oklch(0.26 0 0)      | Dividers, input outlines                           |
+| `--secondary`        | oklch(0.25 0 0)      | Subtle elevated surface (inactive tabs, etc.)      |
+| `--destructive`      | oklch(0.58 0.18 18)  | Errors and delete actions — lightened for dark bg  |
+| `--success`          | oklch(0.58 0.14 145) | Same hue shift as primary — lightened              |
 
 **Signal category colors** — used for category dots and badges. In dark mode, signal cards use a neutral border at rest that transitions to `--primary` on hover (no colored left border).
 
@@ -85,10 +85,10 @@ Chart tokens (`--chart-1` through `--chart-4`) reference signal tokens — singl
 
 **Layout tokens:**
 
-| Token            | Light                 | Dark            | Role                                        |
-| ---------------- | --------------------- | --------------- | ------------------------------------------- |
-| `--background`   | oklch(0.985 0.008 80) | oklch(0.16 0 0) | Header + center column (section 2)          |
-| `--column-flank` | oklch(0.96 0.013 80)  | oklch(0.12 0 0) | Section 1 + section 3 — flanks are darkest  |
+| Token            | Light                 | Dark            | Role                                       |
+| ---------------- | --------------------- | --------------- | ------------------------------------------ |
+| `--background`   | oklch(0.985 0.008 80) | oklch(0.16 0 0) | Header + center column (section 2)         |
+| `--column-flank` | oklch(0.96 0.013 80)  | oklch(0.12 0 0) | Section 1 + section 3 — flanks are darkest |
 
 Color rules:
 

@@ -69,7 +69,12 @@ A solo developer who knows how to build but doesn't yet know what to build. Disc
 - Fonts: Inter (body, headlines) + JetBrains Mono (badges, tags, code, timestamps).
 - Motion: Minimal. Subtle fade on load. Nothing moves unless it has to.
 - Avoid: no gradients, no blue of any shade, no decorative illustrations, no stock photos.
-- Accent green (`oklch(0.75 0.18 142)` dark / `oklch(0.52 0.18 142)` light) is the single identity color.
+- Burnt orange (`oklch(0.62 0.14 38)` dark / `oklch(0.52 0.14 38)` light, hue 38) is the single identity color.
+- Dark mode is neutral graphite — zero chroma surfaces. Depth order: column-flank `oklch(0.12 0 0)` → background `oklch(0.16 0 0)` → card `oklch(0.21 0 0)`. Orange pops against neutral, not warm-tinted, backgrounds.
+- Desktop: three-column layout (signal feed / observations / theses). Mobile: single-panel with bottom tab nav switching between columns.
+- Action buttons on cards are hidden behind hover on desktop. On touch devices (`@media (hover: none)`) they are always visible.
+- Active filter tabs: outlined only — `border-foreground/60 text-foreground`, no background fill.
+- Card borders in dark: neutral at rest, orange (`border-primary`) on hover for observation cards.
 
 **Emotional Arc:**
 
@@ -134,21 +139,19 @@ This project uses Tailwind CSS v4. The rules are different from v3 — follow th
      The @theme block below bridges to the boilerplate token aliases. -->
 
 ```css
-/* ✅ correct — generates text-accent, bg-surface, border-border, etc. */
+/* ✅ correct — generates text-primary, bg-card, border-border, etc. */
 @theme {
-  --color-accent: oklch(0.75 0.18 142); /* green signal color — dark mode primary */
-  --color-secondary: oklch(0.72 0.19 27); /* orange-red — warnings, contrarian markers */
-  --color-bg: oklch(0.1 0 0); /* near-black page background (dark) */
-  --color-text: oklch(0.92 0 0); /* near-white body text (dark) */
-  --color-muted: oklch(0.65 0 0); /* secondary text, placeholders */
-  --color-surface: oklch(0.14 0 0); /* card/panel surface (dark) */
-  --color-border: oklch(0.26 0 0); /* dividers, input outlines (dark) */
+  --color-primary: oklch(0.62 0.14 38); /* burnt orange — dark mode CTAs and identity */
+  --color-background: var(--background); /* bridges :root token to TW utility */
+  --color-card: var(--card); /* elevated surface — panels, modals */
+  --color-border: var(--border); /* dividers, input outlines */
+  --color-muted-foreground: var(--muted-foreground); /* secondary text */
   --font-heading: var(--font-sans); /* Inter */
 }
 
 /* ❌ wrong — :root creates CSS variables but NO utility classes */
 :root {
-  --color-accent: oklch(0.75 0.18 142);
+  --color-primary: oklch(0.62 0.14 38);
 }
 ```
 
