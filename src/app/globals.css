@@ -9,7 +9,7 @@
   --foreground: oklch(0.18 0.02 55);
   --card: oklch(0.94 0.013 80);
   --card-foreground: oklch(0.18 0.02 55);
-  --popover: oklch(0.96 0.013 80);
+  --popover: oklch(0.94 0.013 80); /* card value — popovers are elevated surfaces, not page bg */
   --popover-foreground: oklch(0.18 0.02 55);
   --primary: oklch(0.52 0.14 38);
   --primary-foreground: oklch(0.97 0.01 80);
@@ -28,9 +28,13 @@
 
   /* Signal category colors — light mode */
   --signal-trends: oklch(0.48 0.14 145);
-  --signal-complaints: oklch(0.52 0.14 38);
+  --signal-complaints: oklch(0.48 0.16 22); /* redder than --primary so category dots ≠ action buttons */
   --signal-indie: oklch(0.5 0.16 264);
   --signal-data: oklch(0.52 0.12 55);
+
+  /* Semantic status */
+  --success: oklch(0.48 0.14 145); /* same hue as signal-trends */
+  --success-foreground: oklch(0.97 0.01 80);
 
   --sidebar: oklch(0.92 0.012 75);
   --sidebar-foreground: oklch(0.25 0.02 55);
@@ -41,10 +45,11 @@
   --sidebar-border: oklch(0.84 0.015 75);
   --sidebar-ring: oklch(0.52 0.14 38);
 
-  --chart-1: oklch(0.52 0.14 38);
-  --chart-2: oklch(0.48 0.14 145);
-  --chart-3: oklch(0.5 0.16 264);
-  --chart-4: oklch(0.52 0.12 55);
+  /* Chart palette — references signal tokens so they stay in sync */
+  --chart-1: var(--signal-trends);
+  --chart-2: var(--signal-complaints);
+  --chart-3: var(--signal-indie);
+  --chart-4: var(--signal-data);
   --chart-5: oklch(0.5 0.12 300);
 }
 
@@ -76,6 +81,10 @@
   --signal-indie: oklch(0.72 0.16 264);
   --signal-data: oklch(0.75 0.15 55);
 
+  /* Semantic status */
+  --success: oklch(0.65 0.16 145);
+  --success-foreground: oklch(0.1 0 0);
+
   --sidebar: oklch(0.12 0 0);
   --sidebar-foreground: oklch(0.82 0 0);
   --sidebar-primary: oklch(0.75 0.18 142);
@@ -85,10 +94,11 @@
   --sidebar-border: oklch(0.26 0 0);
   --sidebar-ring: oklch(0.75 0.18 142);
 
-  --chart-1: oklch(0.75 0.18 142);
-  --chart-2: oklch(0.72 0.19 27);
-  --chart-3: oklch(0.72 0.16 264);
-  --chart-4: oklch(0.75 0.15 55);
+  /* Chart palette — references signal tokens so they stay in sync */
+  --chart-1: var(--signal-trends);
+  --chart-2: var(--signal-complaints);
+  --chart-3: var(--signal-indie);
+  --chart-4: var(--signal-data);
   --chart-5: oklch(0.65 0.12 300);
 }
 
@@ -136,6 +146,8 @@
   --color-signal-complaints: var(--signal-complaints);
   --color-signal-indie: var(--signal-indie);
   --color-signal-data: var(--signal-data);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
 }
 
 @layer base {

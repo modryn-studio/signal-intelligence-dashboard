@@ -37,7 +37,7 @@ export default function EmailSignup() {
       <p className="mt-1 text-sm text-muted-foreground">{site.waitlist.subheadline}</p>
 
       {state === 'done' ? (
-        <p className="mt-4 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-400">
+        <p className="mt-4 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
           {site.waitlist.success}
         </p>
       ) : (
@@ -58,7 +58,7 @@ export default function EmailSignup() {
       )}
 
       {state === 'error' && (
-        <p className="mt-2 text-xs text-red-400">Something went wrong. Try again.</p>
+        <p className="mt-2 text-xs text-destructive">Something went wrong. Try again.</p>
       )}
     </div>
   );
