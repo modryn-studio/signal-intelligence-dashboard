@@ -200,7 +200,7 @@ export function ObservationsPanel() {
           <div key={date} className="flex flex-col gap-2">
             <button
               onClick={() => toggleDate(date)}
-              className="hover:bg-muted/50 -mx-1 mt-1 mb-1 flex w-full cursor-pointer items-start gap-1.5 rounded px-1 py-0.5 text-left transition-colors"
+              className="hover:bg-muted -mx-1 mt-1 mb-1 flex w-full cursor-pointer items-start gap-1.5 rounded px-1 py-0.5 text-left transition-colors"
             >
               <span
                 className="text-muted-foreground/60 dark:text-muted-foreground/80 mt-0.5 inline-block font-mono text-[10px] transition-transform duration-150"
