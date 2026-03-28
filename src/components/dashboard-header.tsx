@@ -22,14 +22,14 @@ function StreakDots({ streak }: { streak: { date: string; count: number }[] }) {
   const today = new Date();
   const dots = Array.from({ length: 14 }, (_, i) => {
     const d = new Date(today);
-    d.setDate(d.getDate() - (13 - i));
+    d.setDate(d.getDate() - i);
     const dateStr = d.toISOString().split('T')[0];
     const entry = streak.find((s) => s.date.substring(0, 10) === dateStr);
     return { dateStr, count: entry?.count || 0 };
   });
 
   return (
-    <div className="flex items-center gap-1" title="14-day signal streak">
+    <div className="flex items-center gap-1" title="14-day signal streak (today on left)">
       {dots.map(({ dateStr, count }) => (
         <div
           key={dateStr}
@@ -69,18 +69,14 @@ export function DashboardHeader() {
     <>
       <header className="border-border bg-card/80 sticky top-0 z-10 border-b backdrop-blur-sm">
         <div className="flex items-center justify-between gap-4 px-6 py-3">
-          {/* Left: identity */}
+          {/* Left: daily question */}
           <div className="flex min-w-0 items-center gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-primary font-mono text-[10px] tracking-widest uppercase">
-                  Signal Intelligence
-                </span>
-                <span className="text-muted-foreground/40 font-mono text-[10px]">—</span>
-                <span className="text-muted-foreground/60 font-mono text-[10px]">{dateStr}</span>
-              </div>
-              <p className="text-foreground/80 mt-0.5 text-sm leading-snug text-balance italic">
+            <div className="min-w-0">
+              <p className="text-foreground font-serif text-xl leading-tight text-balance italic lg:text-2xl">
                 &ldquo;{question}&rdquo;
+              </p>
+              <p className="text-muted-foreground/50 mt-1 font-mono text-[10px] tracking-wider">
+                — {dateStr}
               </p>
             </div>
           </div>

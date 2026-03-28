@@ -21,6 +21,15 @@ import {
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
+function useActiveDays() {
+  const { data } = useSWR<{ recent_streak: { date: string; count: number }[] }>(
+    '/api/stats',
+    fetcher,
+    { refreshInterval: 60000 }
+  );
+  return (data?.recent_streak || []).filter((d) => d.count > 0).length;
+}
+
 function ObservationCard({
   obs,
   onDelete,
@@ -99,6 +108,7 @@ function ObservationCard({
 }
 
 export function ObservationsPanel() {
+  const activeDays = useActiveDays();
   const { data: observations, mutate } = useSWR<Observation[]>(
     '/api/observations?limit=20',
     fetcher,
@@ -170,14 +180,16 @@ export function ObservationsPanel() {
             <p className="text-muted-foreground/70 font-mono text-xs tracking-widest uppercase">
               No observations yet
             </p>
-            <p className="text-muted-foreground/55 max-w-48 text-xs leading-relaxed">
-              After consuming signal, what patterns do you keep noticing?
+            <p className="text-muted-foreground/55 max-w-52 text-xs leading-relaxed">
+              {activeDays >= 3
+                ? `${activeDays} days in. Patterns take time — but they're forming. What keeps showing up? Tag it before it fades.`
+                : "You've consumed signal. What keeps showing up? Tag it before it fades."}
             </p>
             <Button
               onClick={() => setAddModalOpen(true)}
               variant="ghost"
               size="sm"
-              className="text-muted-foreground hover:text-foreground mt-1 font-mono text-xs"
+              className="text-muted-foreground hover:text-primary mt-1 font-mono text-xs"
             >
               + First observation
             </Button>

@@ -475,7 +475,9 @@ export function EvaluateSignalsModal({
         {/* Results */}
         {isDone && evaluations.length === 0 && (
           <div className="p-5">
-            <p className="text-muted-foreground font-mono text-sm">No signals to evaluate today.</p>
+            <p className="text-muted-foreground font-mono text-sm">
+              No signals to evaluate today. Log more inputs to surface patterns.
+            </p>
             <Button onClick={onClose} size="sm" className="mt-3 font-mono text-xs">
               Close
             </Button>

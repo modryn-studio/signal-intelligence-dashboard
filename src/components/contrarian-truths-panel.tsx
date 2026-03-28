@@ -224,7 +224,7 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
                   <button
                     onClick={() => setInvalidateDialogOpen(true)}
                     disabled={updating}
-                    className="text-muted-foreground hover:text-destructive-foreground border-border rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
+                    className="text-muted-foreground hover:text-destructive hover:border-destructive/40 border-border rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
                   >
                     Invalidate
                   </button>
@@ -342,21 +342,25 @@ export function ContrarianTruthsPanel() {
                 ? 'None validated yet'
                 : filter === 'invalidated'
                   ? 'None invalidated'
-                  : 'No theses yet'}
+                  : truths && truths.length > 0
+                    ? 'No active theses'
+                    : 'No theses yet'}
             </p>
             <p className="text-muted-foreground/55 max-w-48 text-xs leading-relaxed">
               {filter === 'validated'
                 ? 'Validated theses have been confirmed by the market. Keep observing.'
                 : filter === 'invalidated'
                   ? 'Invalidated theses are ones the market proved wrong. Nothing here yet.'
-                  : "After enough observations, what contrarian belief are you forming that most haven't caught on to?"}
+                  : truths && truths.length > 0
+                    ? 'Check Validated or Invalidated — or form a new one.'
+                    : "After enough observations, what contrarian belief are you forming that most haven't caught on to?"}
             </p>
-            {filter === 'active' && (
+            {filter === 'active' && (!truths || truths.length === 0) && (
               <Button
                 onClick={() => setAddModalOpen(true)}
                 variant="ghost"
                 size="sm"
-                className="text-muted-foreground hover:text-foreground mt-1 font-mono text-xs"
+                className="text-muted-foreground hover:text-primary mt-1 font-mono text-xs"
               >
                 + Form first thesis
               </Button>

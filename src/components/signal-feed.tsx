@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon } from 'lucide-react';
 import { AddInputModal } from '@/components/add-input-modal';
 import { AddObservationModal } from '@/components/add-observation-modal';
 import { AgentRunModal } from '@/components/agent-run-modal';
@@ -79,6 +79,7 @@ function InputCard({
   const cat = input.source_category as Category;
   const styles = CATEGORY_STYLES[cat] || CATEGORY_STYLES.trends;
   const [deleting, setDeleting] = useState(false);
+  const [notesExpanded, setNotesExpanded] = useState(false);
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -140,9 +141,24 @@ function InputCard({
             </div>
 
             {input.notes && (
-              <p className="text-muted-foreground border-border mt-2 border-l pl-2 text-xs leading-relaxed italic">
-                {input.notes}
-              </p>
+              <div className="mt-2">
+                <button
+                  onClick={() => setNotesExpanded((v) => !v)}
+                  className="text-muted-foreground/60 hover:text-muted-foreground flex items-center gap-1 font-mono text-[10px] transition-colors"
+                >
+                  <span>{notesExpanded ? 'hide insight' : 'view insight'}</span>
+                  {notesExpanded ? (
+                    <ChevronUpIcon className="h-2.5 w-2.5" />
+                  ) : (
+                    <ChevronDownIcon className="h-2.5 w-2.5" />
+                  )}
+                </button>
+                {notesExpanded && (
+                  <p className="text-muted-foreground border-primary/30 mt-1.5 border-l-2 pl-2 text-xs leading-relaxed italic">
+                    {input.notes}
+                  </p>
+                )}
+              </div>
             )}
 
             {/* Actions – shown on hover */}
@@ -185,6 +201,7 @@ export function SignalFeed() {
   const [agentModalOpen, setAgentModalOpen] = useState(false);
   const [evaluateModalOpen, setEvaluateModalOpen] = useState(false);
   const [observeModalOpen, setObserveModalOpen] = useState(false);
+  const [sourcesExpanded, setSourcesExpanded] = useState(true);
   const [observePrefill, setObservePrefill] = useState<
     { body: string; relatedInputIds: number[]; title?: string; tags?: string } | undefined
   >(undefined);
@@ -282,9 +299,9 @@ export function SignalFeed() {
             >
               <ChevronLeftIcon className="h-3 w-3" />
             </button>
-            <p className="text-muted-foreground/60 text-xs">
+            <p className="text-muted-foreground/60 font-mono text-xs">
               {isToday
-                ? `${inputs?.length || 0} captured today`
+                ? 'Today'
                 : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric',
@@ -305,7 +322,7 @@ export function SignalFeed() {
             <DropdownMenuTrigger asChild>
               <Button
                 size="sm"
-                className="border-border text-muted-foreground hover:text-foreground h-7 border bg-transparent px-3 font-mono text-xs tracking-wider"
+                className="border-border text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary h-7 border bg-transparent px-3 font-mono text-xs tracking-wider"
               >
                 Agent
                 <ChevronDownIcon className="ml-1 h-3 w-3" />
@@ -371,38 +388,61 @@ export function SignalFeed() {
       </div>
 
       {/* Signal source quick-access links */}
-      <div className="grid grid-cols-2 gap-1.5">
-        {[
-          { name: 'Hacker News', url: 'https://news.ycombinator.com', cat: 'trends' as Category },
-          { name: 'Product Hunt', url: 'https://producthunt.com', cat: 'trends' as Category },
-          { name: 'Indie Hackers', url: 'https://indiehackers.com', cat: 'indie' as Category },
-          { name: 'Exploding Topics', url: 'https://explodingtopics.com', cat: 'data' as Category },
-          { name: 'r/SaaS', url: 'https://reddit.com/r/SaaS', cat: 'complaints' as Category },
-          {
-            name: 'r/Entrepreneur',
-            url: 'https://reddit.com/r/entrepreneur',
-            cat: 'complaints' as Category,
-          },
-        ].map((link) => {
-          const styles = CATEGORY_STYLES[link.cat];
-          return (
-            <a
-              key={link.name}
-              href={link.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`hover:border-border/80 flex items-center gap-2 rounded border px-2.5 py-1.5 text-xs transition-colors ${styles.border} bg-card group`}
-            >
-              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${styles.dot}`} />
-              <span className="text-muted-foreground group-hover:text-foreground font-mono transition-colors">
-                {link.name}
-              </span>
-              <span className="text-muted-foreground/40 group-hover:text-muted-foreground ml-auto transition-colors">
-                ↗
-              </span>
-            </a>
-          );
-        })}
+      <div>
+        <button
+          onClick={() => setSourcesExpanded((v) => !v)}
+          className="text-muted-foreground/50 hover:text-muted-foreground mb-1.5 flex items-center gap-1 font-mono text-[10px] tracking-widest uppercase transition-colors"
+        >
+          <span>Sources</span>
+          {sourcesExpanded ? (
+            <ChevronUpIcon className="h-2.5 w-2.5" />
+          ) : (
+            <ChevronDownIcon className="h-2.5 w-2.5" />
+          )}
+        </button>
+        {sourcesExpanded && (
+          <div className="grid grid-cols-2 gap-1.5">
+            {[
+              {
+                name: 'Hacker News',
+                url: 'https://news.ycombinator.com',
+                cat: 'trends' as Category,
+              },
+              { name: 'Product Hunt', url: 'https://producthunt.com', cat: 'trends' as Category },
+              { name: 'Indie Hackers', url: 'https://indiehackers.com', cat: 'indie' as Category },
+              {
+                name: 'Exploding Topics',
+                url: 'https://explodingtopics.com',
+                cat: 'data' as Category,
+              },
+              { name: 'r/SaaS', url: 'https://reddit.com/r/SaaS', cat: 'complaints' as Category },
+              {
+                name: 'r/Entrepreneur',
+                url: 'https://reddit.com/r/entrepreneur',
+                cat: 'complaints' as Category,
+              },
+            ].map((link) => {
+              const styles = CATEGORY_STYLES[link.cat];
+              return (
+                <a
+                  key={link.name}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`hover:border-border/80 flex items-center gap-2 rounded border px-2.5 py-1.5 text-xs transition-colors ${styles.border} bg-card group`}
+                >
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${styles.dot}`} />
+                  <span className="text-muted-foreground group-hover:text-foreground font-mono transition-colors">
+                    {link.name}
+                  </span>
+                  <span className="text-muted-foreground/40 group-hover:text-muted-foreground ml-auto transition-colors">
+                    ↗
+                  </span>
+                </a>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Feed */}
@@ -421,7 +461,7 @@ export function SignalFeed() {
                   onClick={() => openAdd()}
                   variant="ghost"
                   size="sm"
-                  className="text-muted-foreground hover:text-foreground mt-1 font-mono text-xs"
+                  className="text-muted-foreground hover:text-primary mt-1 font-mono text-xs"
                 >
                   + Log your first signal
                 </Button>
