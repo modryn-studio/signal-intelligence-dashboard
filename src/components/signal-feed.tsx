@@ -28,11 +28,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { getTodayQuestion } from '@/lib/utils';
+import { getTodayQuestion, localDateStr } from '@/lib/utils';
 
 // Must match the cache key used in evaluate-signals-modal.tsx
 function getTodayEvalCacheKey() {
-  return 'signal-eval-' + new Date().toISOString().split('T')[0];
+  return 'signal-eval-' + localDateStr();
 }
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -190,7 +190,7 @@ function InputCard({
 }
 
 export function SignalFeed() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateStr();
   const [selectedDate, setSelectedDate] = useState(today);
   const isToday = selectedDate === today;
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
@@ -219,7 +219,7 @@ export function SignalFeed() {
   const shiftDay = (delta: number) => {
     const d = new Date(selectedDate + 'T12:00:00');
     d.setDate(d.getDate() + delta);
-    const next = d.toISOString().split('T')[0];
+    const next = localDateStr(d);
     if (next <= today) setSelectedDate(next);
   };
 

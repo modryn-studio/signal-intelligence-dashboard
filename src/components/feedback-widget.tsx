@@ -94,7 +94,7 @@ export default function FeedbackWidget() {
   const formBody = (
     <div className="p-4">
       {state === 'done' ? (
-        <p className="rounded-2xl border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+        <p className="border-success/30 bg-success/10 text-success rounded-2xl border px-3 py-2 text-sm">
           Thanks. Noted.
         </p>
       ) : (
@@ -118,7 +118,7 @@ export default function FeedbackWidget() {
             disabled={state === 'submitting'}
             className="mt-2 text-xs"
           />
-          {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+          {error && <p className="text-destructive mt-2 text-xs">{error}</p>}
           <div className="mt-3 flex justify-end">
             <Button
               onClick={handleSubmit}
@@ -136,13 +136,13 @@ export default function FeedbackWidget() {
   );
 
   const panelHeader = (
-    <div className="flex items-center justify-between border-b border-border px-4 py-3">
-      <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+    <div className="border-border flex items-center justify-between border-b px-4 py-3">
+      <span className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
         Feedback
       </span>
       <button
         onClick={close}
-        className="-mr-1 p-1 text-muted-foreground transition-colors hover:text-foreground"
+        className="text-muted-foreground hover:text-foreground -mr-1 p-1 transition-colors"
         aria-label="Close"
       >
         <X size={14} />
@@ -159,10 +159,8 @@ export default function FeedbackWidget() {
         }`}
         style={{ bottom: keyboardOffset }}
       >
-        {isOpen && (
-          <div className="fixed inset-0 -z-10 bg-black/40" onClick={close} />
-        )}
-        <div className="max-h-[85vh] overflow-y-auto border-t-2 border-border bg-card pb-[env(safe-area-inset-bottom)] shadow-2xl">
+        {isOpen && <div className="fixed inset-0 -z-10 bg-black/40" onClick={close} />}
+        <div className="border-border bg-card max-h-[85vh] overflow-y-auto border-t-2 pb-[env(safe-area-inset-bottom)] shadow-2xl">
           {panelHeader}
           {formBody}
         </div>
@@ -172,20 +170,20 @@ export default function FeedbackWidget() {
       {/* Whole assembly translates together. Closed = shifted right by panel width (w-72 = 288px),
           leaving only the tab visible at the viewport edge. Open = translate-x-0. */}
       <div
-        className={`fixed right-0 top-1/2 z-50 hidden -translate-y-1/2 items-start transition-transform duration-300 ease-out md:flex ${
+        className={`fixed top-1/2 right-0 z-50 hidden -translate-y-1/2 items-start transition-transform duration-300 ease-out md:flex ${
           isOpen ? 'translate-x-0' : 'translate-x-72'
         }`}
       >
         {/* Tab — leftmost, always the visible 'handle' */}
         <button
           onClick={() => setState(isOpen ? 'idle' : 'open')}
-          className="flex -rotate-90 items-center gap-2 rounded-t-lg border border-b-0 border-border bg-card px-3 py-1.5 text-xs font-medium uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
+          className="border-border bg-card text-muted-foreground hover:text-foreground flex -rotate-90 items-center gap-2 rounded-t-lg border border-b-0 px-3 py-1.5 text-xs font-medium tracking-widest uppercase transition-colors"
           aria-label="Open feedback"
         >
           Feedback
         </button>
         {/* Panel */}
-        <div className="w-72 overflow-y-auto rounded-bl-xl border border-border bg-card shadow-2xl">
+        <div className="border-border bg-card w-72 overflow-y-auto rounded-bl-xl border shadow-2xl">
           {panelHeader}
           {formBody}
         </div>

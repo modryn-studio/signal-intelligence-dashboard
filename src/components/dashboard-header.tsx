@@ -16,14 +16,14 @@ interface Stats {
   recent_streak: { date: string; count: number }[];
 }
 
-import { getTodayQuestion } from '@/lib/utils';
+import { getTodayQuestion, localDateStr } from '@/lib/utils';
 
 function StreakDots({ streak }: { streak: { date: string; count: number }[] }) {
   const today = new Date();
   const dots = Array.from({ length: 14 }, (_, i) => {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
+    const dateStr = localDateStr(d);
     const entry = streak.find((s) => s.date.substring(0, 10) === dateStr);
     return { dateStr, count: entry?.count || 0 };
   });

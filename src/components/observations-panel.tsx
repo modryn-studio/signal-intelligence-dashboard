@@ -3,7 +3,7 @@
 import useSWR from 'swr';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import type { Observation } from '@/lib/types';
-import { getQuestionForDate } from '@/lib/utils';
+import { getQuestionForDate, localDateStr } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { AddObservationModal } from '@/components/add-observation-modal';
 import { ObservationTruthPickerModal } from '@/components/observation-truth-picker-modal';
@@ -121,7 +121,7 @@ export function ObservationsPanel() {
   const [pickerObsId, setPickerObsId] = useState<number | null>(null);
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
   const initializedRef = useRef(false);
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateStr();
 
   const grouped = useMemo(() => {
     const map = new Map<string, Observation[]>();

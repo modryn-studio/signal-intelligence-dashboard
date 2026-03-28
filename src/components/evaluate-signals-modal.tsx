@@ -12,6 +12,7 @@ import {
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
+import { localDateStr } from '@/lib/utils';
 import type { EvaluationResult, Synthesis } from '@/app/api/agent/evaluate/route';
 
 // ─── Loading phase ────────────────────────────────────────────────────────────
@@ -224,7 +225,7 @@ interface CacheEntry {
 }
 
 function getTodayCacheKey() {
-  return CACHE_KEY_PREFIX + new Date().toISOString().split('T')[0];
+  return CACHE_KEY_PREFIX + localDateStr();
 }
 
 function readCache(): CacheEntry | null {

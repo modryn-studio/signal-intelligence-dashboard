@@ -34,10 +34,10 @@ export default function EmailSignup() {
   return (
     <div className="w-full max-w-md">
       <h2 className="text-xl font-semibold">{site.waitlist.headline}</h2>
-      <p className="mt-1 text-sm text-muted-foreground">{site.waitlist.subheadline}</p>
+      <p className="text-muted-foreground mt-1 text-sm">{site.waitlist.subheadline}</p>
 
       {state === 'done' ? (
-        <p className="mt-4 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
+        <p className="border-success/30 bg-success/10 text-success mt-4 rounded-xl border px-4 py-3 text-sm">
           {site.waitlist.success}
         </p>
       ) : (
@@ -58,7 +58,7 @@ export default function EmailSignup() {
       )}
 
       {state === 'error' && (
-        <p className="mt-2 text-xs text-destructive">Something went wrong. Try again.</p>
+        <p className="text-destructive mt-2 text-xs">Something went wrong. Try again.</p>
       )}
     </div>
   );

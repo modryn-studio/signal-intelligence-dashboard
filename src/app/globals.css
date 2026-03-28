@@ -28,7 +28,9 @@
 
   /* Signal category colors — light mode */
   --signal-trends: oklch(0.48 0.14 145);
-  --signal-complaints: oklch(0.48 0.16 22); /* redder than --primary so category dots ≠ action buttons */
+  --signal-complaints: oklch(
+    0.48 0.16 22
+  ); /* redder than --primary so category dots ≠ action buttons */
   --signal-indie: oklch(0.5 0.16 264);
   --signal-data: oklch(0.52 0.12 55);
 

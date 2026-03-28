@@ -5,6 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Returns today's date as YYYY-MM-DD in the user's local timezone.
+ *  Never use new Date().toISOString().split('T')[0] — that's UTC and is
+ *  wrong for users in UTC-N timezones after local midnight. */
+export function localDateStr(date: Date = new Date()): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 const DAILY_QUESTIONS = [
   'Where is something growing fast but being served poorly?',
   'What do people keep complaining about that no one has fixed?',
