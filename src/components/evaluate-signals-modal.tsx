@@ -153,7 +153,7 @@ function EvalCard({
 
       {/* Proposed observation (observe cards only) */}
       {ev.recommendation === 'observe' && ev.proposed_title && !isAccepted && !isDeleted && (
-        <div className="border-border mt-3 rounded border-l-2 pl-3">
+        <div className="mt-3">
           <button
             onClick={() => setExpanded((x) => !x)}
             className="text-muted-foreground hover:text-foreground flex items-center gap-1 font-mono text-[10px] tracking-wider uppercase transition-colors"
@@ -424,7 +424,7 @@ export function EvaluateSignalsModal({
     >
       <DialogContent
         showCloseButton={isDone || isError}
-        className="flex max-h-[85vh] max-w-2xl flex-col gap-0 p-0"
+        className="bg-card flex max-h-[85vh] max-w-2xl flex-col gap-0 p-0"
       >
         <DialogTitle className="sr-only">Deep Evaluate Signals</DialogTitle>
         {/* Fixed header */}
@@ -489,20 +489,22 @@ export function EvaluateSignalsModal({
           <>
             {/* Analysis panel — collapsible, synthesis first */}
             {synthesis && (
-              <div className="border-border max-h-[45%] shrink-0 overflow-y-auto border-b">
-                <button
-                  onClick={() => setAnalysisOpen((v) => !v)}
-                  className="hover:bg-surface/50 flex w-full items-center justify-between px-5 py-3"
-                >
-                  <p className="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-                    Analysis
-                  </p>
-                  {analysisOpen ? (
-                    <ChevronUpIcon className="text-muted-foreground h-3.5 w-3.5" />
-                  ) : (
-                    <ChevronDownIcon className="text-muted-foreground h-3.5 w-3.5" />
-                  )}
-                </button>
+              <div className="bg-background border-border max-h-[45%] shrink-0 overflow-y-auto border-b">
+                <div key={String(open)} className="animate-hint-pulse">
+                  <button
+                    onClick={() => setAnalysisOpen((v) => !v)}
+                    className="hover:bg-surface/50 flex w-full items-center justify-between px-5 py-3"
+                  >
+                    <p className="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
+                      Analysis
+                    </p>
+                    {analysisOpen ? (
+                      <ChevronUpIcon className="text-muted-foreground h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronDownIcon className="text-muted-foreground h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </div>
                 {analysisOpen && (
                   <div className="px-5 pb-4">
                     <div className="grid grid-cols-[80px_1fr] gap-x-3 gap-y-1.5">
@@ -562,8 +564,8 @@ export function EvaluateSignalsModal({
                       onClick={() => setFilter(f)}
                       className={`rounded border px-2.5 py-1 font-mono text-[10px] tracking-wider uppercase transition-colors ${
                         isActive
-                          ? 'border-foreground text-foreground bg-secondary'
-                          : 'border-border text-muted-foreground hover:border-muted-foreground'
+                          ? 'border-foreground/60 text-foreground'
+                          : 'border-border text-muted-foreground hover:border-muted-foreground dark:bg-card'
                       }`}
                     >
                       {f === 'all' ? 'All' : f} {count}

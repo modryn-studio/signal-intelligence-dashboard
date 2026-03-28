@@ -34,19 +34,20 @@ interface ContrarianTruth {
 const STATUS_STYLES: Record<Status, { label: string; classes: string }> = {
   forming: {
     label: 'Forming',
-    classes: 'text-signal-data border-signal-data/40 bg-signal-data/5',
+    classes:
+      'text-signal-data border-signal-data/40 bg-signal-data/5 dark:bg-card dark:border-primary/45 dark:text-primary',
   },
   confident: {
     label: 'Confident',
-    classes: 'text-signal-trends border-signal-trends/40 bg-signal-trends/5',
+    classes: 'text-signal-trends border-signal-trends/40 bg-signal-trends/5 dark:bg-card',
   },
   validated: {
     label: 'Validated',
-    classes: 'text-signal-indie border-signal-indie/40 bg-signal-indie/5',
+    classes: 'text-signal-indie border-signal-indie/40 bg-signal-indie/5 dark:bg-card',
   },
   invalidated: {
     label: 'Invalidated',
-    classes: 'text-muted-foreground border-border bg-transparent',
+    classes: 'text-muted-foreground border-border bg-transparent dark:bg-card',
   },
 };
 
@@ -168,7 +169,9 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
                   onClick={() => handleSetConviction(n)}
                   disabled={updating}
                   className={`h-2 w-2 rounded-full transition-all hover:scale-125 disabled:cursor-default ${
-                    n <= truth.conviction_level ? 'bg-current opacity-90' : 'bg-current opacity-15'
+                    n <= truth.conviction_level
+                      ? 'dark:bg-primary bg-current opacity-90 dark:opacity-100'
+                      : 'bg-current opacity-15 dark:opacity-30'
                   }`}
                 />
               ))}
@@ -209,14 +212,14 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
                 </span>
               </div>
 
-              {/* Actions — shown on hover */}
+              {/* Actions — shown on hover; always visible on touch */}
               {truth.status !== 'invalidated' && (
-                <div className="mt-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="touch:opacity-100 mt-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
                   {truth.status !== 'validated' && (
                     <button
                       onClick={() => setAdvanceDialogOpen(true)}
                       disabled={updating}
-                      className="text-muted-foreground hover:text-foreground border-border hover:border-muted-foreground rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
+                      className="text-muted-foreground hover:text-foreground/60 border-border hover:border-muted-foreground/60 rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
                     >
                       Advance →
                     </button>
@@ -286,7 +289,7 @@ export function ContrarianTruthsPanel() {
           <h2 className="text-muted-foreground font-mono text-xs tracking-widest uppercase">
             Contrarian Theses
           </h2>
-          <p className="text-muted-foreground/60 mt-0.5 text-xs">
+          <p className="text-muted-foreground/60 dark:text-muted-foreground/80 mt-0.5 text-xs">
             {counts['forming'] || 0} forming · {counts['confident'] || 0} confident ·{' '}
             {counts['validated'] || 0} validated
           </p>
@@ -308,8 +311,8 @@ export function ContrarianTruthsPanel() {
             onClick={() => setFilter(f)}
             className={`rounded border px-2.5 py-1 font-mono text-xs capitalize transition-colors ${
               filter === f
-                ? 'border-foreground text-foreground bg-secondary'
-                : 'border-border text-muted-foreground hover:border-muted-foreground'
+                ? 'border-foreground/60 text-foreground'
+                : 'border-border text-muted-foreground hover:border-muted-foreground dark:bg-card'
             }`}
           >
             {f}

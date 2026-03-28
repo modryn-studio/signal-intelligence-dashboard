@@ -49,13 +49,13 @@ function ObservationCard({
 
   return (
     <AlertDialog>
-      <div className="group border-primary/50 hover:border-primary relative border-l-2 py-2 pl-3 transition-colors">
+      <div className="group border-primary/50 hover:border-primary dark:border-border dark:hover:border-primary relative border-l-2 py-2 pl-3 transition-colors">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <p className="text-foreground text-sm leading-snug font-medium">{obs.title}</p>
             <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{obs.body}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="text-muted-foreground/50 font-mono text-[10px]">
+              <span className="text-muted-foreground/50 dark:text-muted-foreground/70 font-mono text-[10px]">
                 {new Date(obs.created_at).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -68,11 +68,11 @@ function ObservationCard({
               ))}
             </div>
 
-            {/* Actions – shown on hover */}
-            <div className="mt-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+            {/* Actions – shown on hover; always visible on touch */}
+            <div className="touch:opacity-100 mt-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
               <button
                 onClick={() => onAddToThesis(obs.id)}
-                className="text-muted-foreground hover:text-foreground border-border hover:border-muted-foreground rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
+                className="text-muted-foreground hover:text-foreground/60 border-border hover:border-muted-foreground/60 rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
               >
                 &rarr; Add to thesis
               </button>
@@ -81,7 +81,7 @@ function ObservationCard({
           <AlertDialogTrigger asChild>
             <button
               disabled={deleting}
-              className="text-muted-foreground hover:text-destructive-foreground mt-0.5 shrink-0 text-xs opacity-0 transition-all group-hover:opacity-100"
+              className="text-muted-foreground hover:text-destructive-foreground touch:opacity-100 mt-0.5 shrink-0 text-xs opacity-0 transition-all group-hover:opacity-100"
               aria-label="Delete observation"
             >
               ✕
@@ -200,16 +200,16 @@ export function ObservationsPanel() {
           <div key={date} className="flex flex-col gap-2">
             <button
               onClick={() => toggleDate(date)}
-              className="mt-1 mb-1 flex w-full cursor-pointer items-start gap-1.5 text-left"
+              className="hover:bg-muted/50 -mx-1 mt-1 mb-1 flex w-full cursor-pointer items-start gap-1.5 rounded px-1 py-0.5 text-left transition-colors"
             >
               <span
-                className="text-muted-foreground/40 mt-0.5 inline-block font-mono text-[10px] transition-transform duration-150"
+                className="text-muted-foreground/60 dark:text-muted-foreground/80 mt-0.5 inline-block font-mono text-[10px] transition-transform duration-150"
                 style={{ transform: collapsedDates.has(date) ? 'rotate(0deg)' : 'rotate(90deg)' }}
               >
                 ›
               </span>
               <div className="min-w-0">
-                <p className="text-muted-foreground/60 font-mono text-[10px] tracking-widest uppercase">
+                <p className="text-muted-foreground/75 dark:text-muted-foreground/90 font-mono text-[10px] tracking-widest uppercase">
                   {date === today
                     ? 'Today'
                     : new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
@@ -217,13 +217,13 @@ export function ObservationsPanel() {
                         day: 'numeric',
                       })}
                   {collapsedDates.has(date) && (
-                    <span className="text-muted-foreground/40 ml-1 normal-case">
+                    <span className="text-muted-foreground/60 dark:text-muted-foreground/80 ml-1 normal-case">
                       ({group.length})
                     </span>
                   )}
                 </p>
                 {!collapsedDates.has(date) && (
-                  <p className="text-muted-foreground/35 mt-0.5 text-[10px] leading-snug italic">
+                  <p className="text-muted-foreground/55 dark:text-muted-foreground/75 mt-0.5 text-[10px] leading-snug italic">
                     &ldquo;{getQuestionForDate(date)}&rdquo;
                   </p>
                 )}

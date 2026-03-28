@@ -1,7 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { Sun, Moon } from 'lucide-react';
 import { DigestModal } from '@/components/digest-modal';
@@ -40,7 +40,7 @@ function StreakDots({ streak }: { streak: { date: string; count: number }[] }) {
                 ? 'bg-primary/50'
                 : count >= 1
                   ? 'bg-primary/25'
-                  : 'bg-border'
+                  : 'bg-border dark:bg-muted-foreground/30'
           }`}
           title={`${dateStr}: ${count} inputs`}
         />
@@ -53,6 +53,8 @@ export function DashboardHeader() {
   const { data: stats } = useSWR<Stats>('/api/stats', fetcher, { refreshInterval: 60000 });
   const [digestOpen, setDigestOpen] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const today = new Date();
   const dateStr = today.toLocaleDateString('en-US', {
@@ -67,15 +69,15 @@ export function DashboardHeader() {
 
   return (
     <>
-      <header className="border-border bg-card/80 sticky top-0 z-10 border-b backdrop-blur-sm">
-        <div className="flex items-center justify-between gap-4 px-6 py-3">
+      <header className="border-border bg-background/80 sticky top-0 z-10 border-b backdrop-blur-sm">
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 md:px-6 md:py-3">
           {/* Left: daily question */}
           <div className="flex min-w-0 items-center gap-4">
             <div className="min-w-0">
-              <p className="text-foreground font-serif text-xl leading-tight text-balance italic lg:text-2xl">
+              <p className="text-foreground dark:text-primary font-serif text-base leading-tight text-balance italic md:text-xl lg:text-2xl">
                 &ldquo;{question}&rdquo;
               </p>
-              <p className="text-muted-foreground/50 mt-1 font-mono text-[10px] tracking-wider">
+              <p className="text-muted-foreground/70 dark:text-muted-foreground/85 mt-1 font-mono text-[10px] tracking-wider">
                 — {dateStr}
               </p>
             </div>
@@ -114,7 +116,7 @@ export function DashboardHeader() {
           {/* Right: streak + digest */}
           <div className="flex shrink-0 items-center gap-4">
             <div className="hidden flex-col gap-1 lg:flex">
-              <p className="text-muted-foreground/50 font-mono text-[10px] tracking-wider uppercase">
+              <p className="text-muted-foreground/70 dark:text-muted-foreground/85 font-mono text-[10px] tracking-wider uppercase">
                 14-day streak
               </p>
               <StreakDots streak={stats?.recent_streak || []} />
@@ -122,7 +124,7 @@ export function DashboardHeader() {
             <button
               disabled
               title="Coming soon"
-              className="border-border text-muted-foreground/40 flex cursor-not-allowed items-center gap-2 rounded border px-3 py-1.5 font-mono text-xs"
+              className="border-border text-muted-foreground/40 dark:text-muted-foreground/60 flex cursor-not-allowed items-center gap-2 rounded border px-3 py-1.5 font-mono text-xs"
             >
               <span className="bg-muted-foreground/30 h-1.5 w-1.5 rounded-full" />
               Digest
@@ -132,7 +134,7 @@ export function DashboardHeader() {
               className="border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground rounded border p-1.5 transition-colors"
               aria-label="Toggle theme"
             >
-              {resolvedTheme === 'dark' ? (
+              {mounted && resolvedTheme === 'dark' ? (
                 <Sun className="h-3.5 w-3.5" />
               ) : (
                 <Moon className="h-3.5 w-3.5" />

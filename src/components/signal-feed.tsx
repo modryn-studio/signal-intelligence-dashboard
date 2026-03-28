@@ -39,33 +39,39 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 type Category = keyof typeof SOURCE_CATEGORIES;
 
-const CATEGORY_STYLES: Record<Category, { dot: string; text: string; border: string; bg: string }> =
-  {
-    trends: {
-      dot: 'bg-signal-trends',
-      text: 'text-signal-trends',
-      border: 'border-signal-trends/30',
-      bg: 'bg-signal-trends/10',
-    },
-    complaints: {
-      dot: 'bg-signal-complaints',
-      text: 'text-signal-complaints',
-      border: 'border-signal-complaints/30',
-      bg: 'bg-signal-complaints/10',
-    },
-    indie: {
-      dot: 'bg-signal-indie',
-      text: 'text-signal-indie',
-      border: 'border-signal-indie/30',
-      bg: 'bg-signal-indie/10',
-    },
-    data: {
-      dot: 'bg-signal-data',
-      text: 'text-signal-data',
-      border: 'border-signal-data/30',
-      bg: 'bg-signal-data/10',
-    },
-  };
+const CATEGORY_STYLES: Record<
+  Category,
+  { dot: string; text: string; border: string; bg: string; darkBg: string }
+> = {
+  trends: {
+    dot: 'bg-signal-trends',
+    text: 'text-signal-trends',
+    border: 'border-signal-trends/30',
+    bg: 'bg-signal-trends/10',
+    darkBg: 'dark:bg-signal-trends/5',
+  },
+  complaints: {
+    dot: 'bg-signal-complaints',
+    text: 'text-signal-complaints',
+    border: 'border-signal-complaints/30',
+    bg: 'bg-signal-complaints/10',
+    darkBg: 'dark:bg-signal-complaints/5',
+  },
+  indie: {
+    dot: 'bg-signal-indie',
+    text: 'text-signal-indie',
+    border: 'border-signal-indie/30',
+    bg: 'bg-signal-indie/10',
+    darkBg: 'dark:bg-signal-indie/5',
+  },
+  data: {
+    dot: 'bg-signal-data',
+    text: 'text-signal-data',
+    border: 'border-signal-data/30',
+    bg: 'bg-signal-data/10',
+    darkBg: 'dark:bg-signal-data/5',
+  },
+};
 
 function InputCard({
   input,
@@ -90,10 +96,12 @@ function InputCard({
   return (
     <AlertDialog>
       <div
-        className={`group hover:border-border/80 relative rounded border p-3 transition-colors ${styles.border} bg-card`}
+        className={`group hover:border-border/80 relative rounded border p-3 transition-colors ${styles.border} bg-card dark:border-border/50`}
       >
         <div className="flex items-start gap-2.5">
-          <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${styles.dot}`} />
+          <span
+            className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${styles.dot} dark:opacity-60`}
+          />
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
@@ -113,7 +121,7 @@ function InputCard({
               <AlertDialogTrigger asChild>
                 <button
                   disabled={deleting}
-                  className="text-muted-foreground hover:text-destructive-foreground mt-0.5 shrink-0 text-xs opacity-0 transition-all group-hover:opacity-100"
+                  className="text-muted-foreground hover:text-destructive-foreground touch:opacity-100 mt-0.5 shrink-0 text-xs opacity-0 transition-all group-hover:opacity-100"
                   aria-label="Delete input"
                 >
                   ✕
@@ -123,7 +131,7 @@ function InputCard({
 
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <span
-                className={`rounded px-1.5 py-0.5 font-mono text-[10px] ${styles.bg} ${styles.text}`}
+                className={`rounded px-1.5 py-0.5 font-mono text-[10px] ${styles.bg} ${styles.darkBg} ${styles.text}`}
               >
                 {input.source}
               </span>
@@ -144,7 +152,7 @@ function InputCard({
               <div className="mt-2">
                 <button
                   onClick={() => setNotesExpanded((v) => !v)}
-                  className="text-muted-foreground/60 hover:text-muted-foreground flex items-center gap-1 font-mono text-[10px] transition-colors"
+                  className="text-muted-foreground/60 dark:text-muted-foreground/80 hover:text-muted-foreground flex items-center gap-1 font-mono text-[10px] transition-colors"
                 >
                   <span>{notesExpanded ? 'hide insight' : 'view insight'}</span>
                   {notesExpanded ? (
@@ -154,18 +162,18 @@ function InputCard({
                   )}
                 </button>
                 {notesExpanded && (
-                  <p className="text-muted-foreground border-primary/30 mt-1.5 border-l-2 pl-2 text-xs leading-relaxed italic">
+                  <p className="text-muted-foreground border-border mt-1.5 border-l-2 pl-2 text-xs leading-relaxed italic">
                     {input.notes}
                   </p>
                 )}
               </div>
             )}
 
-            {/* Actions – shown on hover */}
-            <div className="mt-1.5 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+            {/* Actions – shown on hover; always visible on touch */}
+            <div className="touch:opacity-100 mt-1.5 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
               <button
                 onClick={onObserve}
-                className="text-muted-foreground hover:text-foreground border-border hover:border-muted-foreground rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
+                className="text-muted-foreground hover:text-foreground/60 border-border hover:border-muted-foreground/60 rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
               >
                 &rarr; Observe
               </button>
@@ -299,7 +307,7 @@ export function SignalFeed() {
             >
               <ChevronLeftIcon className="h-3 w-3" />
             </button>
-            <p className="text-muted-foreground/60 font-mono text-xs">
+            <p className="text-muted-foreground/60 dark:text-muted-foreground/80 font-mono text-xs">
               {isToday
                 ? 'Today'
                 : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', {
@@ -322,7 +330,7 @@ export function SignalFeed() {
             <DropdownMenuTrigger asChild>
               <Button
                 size="sm"
-                className="border-border text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary h-7 border bg-transparent px-3 font-mono text-xs tracking-wider"
+                className="border-border text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary dark:bg-card h-7 border bg-transparent px-3 font-mono text-xs tracking-wider"
               >
                 Agent
                 <ChevronDownIcon className="ml-1 h-3 w-3" />
@@ -363,8 +371,8 @@ export function SignalFeed() {
           onClick={() => setActiveCategory('all')}
           className={`rounded border px-2.5 py-1 font-mono text-xs transition-colors ${
             activeCategory === 'all'
-              ? 'border-foreground text-foreground bg-secondary'
-              : 'border-border text-muted-foreground hover:border-muted-foreground'
+              ? 'border-foreground/60 text-foreground'
+              : 'border-border text-muted-foreground hover:border-muted-foreground dark:bg-card'
           }`}
         >
           All
@@ -378,7 +386,7 @@ export function SignalFeed() {
               className={`rounded border px-2.5 py-1 font-mono text-xs transition-colors ${
                 activeCategory === cat
                   ? `${styles.border} ${styles.text} ${styles.bg}`
-                  : 'border-border text-muted-foreground hover:border-muted-foreground'
+                  : 'border-border text-muted-foreground hover:border-muted-foreground dark:bg-card'
               }`}
             >
               {SOURCE_CATEGORIES[cat].label}
@@ -391,7 +399,7 @@ export function SignalFeed() {
       <div>
         <button
           onClick={() => setSourcesExpanded((v) => !v)}
-          className="text-muted-foreground/50 hover:text-muted-foreground mb-1.5 flex items-center gap-1 font-mono text-[10px] tracking-widest uppercase transition-colors"
+          className="text-muted-foreground/50 dark:text-muted-foreground/70 hover:text-muted-foreground mb-1.5 flex items-center gap-1 font-mono text-[10px] tracking-widest uppercase transition-colors"
         >
           <span>Sources</span>
           {sourcesExpanded ? (
@@ -429,13 +437,13 @@ export function SignalFeed() {
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`hover:border-border/80 flex items-center gap-2 rounded border px-2.5 py-1.5 text-xs transition-colors ${styles.border} bg-card group`}
+                  className={`hover:border-border/50 border-border group flex items-center gap-2 rounded border px-2.5 py-1.5 text-xs transition-colors`}
                 >
-                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${styles.dot}`} />
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${styles.dot} opacity-60`} />
                   <span className="text-muted-foreground group-hover:text-foreground font-mono transition-colors">
                     {link.name}
                   </span>
-                  <span className="text-muted-foreground/40 group-hover:text-muted-foreground ml-auto transition-colors">
+                  <span className="text-muted-foreground/40 dark:text-muted-foreground/70 group-hover:text-muted-foreground ml-auto transition-colors">
                     ↗
                   </span>
                 </a>

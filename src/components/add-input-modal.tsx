@@ -125,8 +125,8 @@ export function AddInputModal({
                   onClick={() => setSource(s)}
                   className={`rounded border px-2.5 py-1 text-xs transition-colors ${
                     source === s
-                      ? 'border-foreground text-foreground bg-secondary'
-                      : 'border-border text-muted-foreground hover:border-muted-foreground'
+                      ? 'border-foreground/60 text-foreground'
+                      : 'border-border text-muted-foreground hover:border-muted-foreground dark:bg-card'
                   }`}
                 >
                   {s}

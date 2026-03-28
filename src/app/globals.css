@@ -2,10 +2,12 @@
 @import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
+/* Targets touch-primary devices (phones, tablets — no hover capability) */
+@custom-variant touch (@media (hover: none));
 
 :root {
   /* Signal Intelligence Dashboard — light mode (warm cream / burnt-orange) */
-  --background: oklch(0.96 0.013 80);
+  --background: oklch(0.985 0.008 80); /* near-white warm — header + center column */
   --foreground: oklch(0.18 0.02 55);
   --card: oklch(0.94 0.013 80);
   --card-foreground: oklch(0.18 0.02 55);
@@ -53,55 +55,65 @@
   --chart-3: var(--signal-indie);
   --chart-4: var(--signal-data);
   --chart-5: oklch(0.5 0.12 300);
+
+  /* Layout — flank columns stay at original cream, center + header step lighter */
+  --column-flank: oklch(0.96 0.013 80);
 }
 
 .dark {
-  /* Signal Intelligence Dashboard — dark mode (contrast-fixed) */
-  --background: oklch(0.1 0 0);
-  --foreground: oklch(0.92 0 0);
-  --card: oklch(0.14 0 0);
-  --card-foreground: oklch(0.92 0 0);
-  --popover: oklch(0.14 0 0);
-  --popover-foreground: oklch(0.92 0 0);
-  --primary: oklch(0.75 0.18 142);
-  --primary-foreground: oklch(0.1 0 0);
-  --secondary: oklch(0.22 0 0);
-  --secondary-foreground: oklch(0.82 0 0);
-  --muted: oklch(0.18 0 0);
-  --muted-foreground: oklch(0.72 0 0);
-  --accent: oklch(0.75 0.18 142);
-  --accent-foreground: oklch(0.1 0 0);
-  --destructive: oklch(0.65 0.22 27);
-  --destructive-foreground: oklch(0.1 0 0);
+  /* Signal Intelligence Dashboard — dark mode (neutral graphite)
+     All surfaces are pure neutral (zero chroma). The burnt orange primary and
+     signal category colors pop cleanly with no warm background interference.
+     Depth order: column-flank (darkest) < background < card (lightest).
+     Lightness is intentionally raised vs prior near-black to read as graphite. */
+  --background: oklch(0.16 0 0); /* center column + header — dark gray */
+  --foreground: oklch(0.95 0 0); /* near-white, high contrast */
+  --card: oklch(0.21 0 0); /* elevated card surfaces */
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.21 0 0);
+  --popover-foreground: oklch(0.95 0 0);
+  --primary: oklch(0.62 0.14 38);
+  --primary-foreground: oklch(0.97 0.01 80);
+  --secondary: oklch(0.25 0 0);
+  --secondary-foreground: oklch(0.85 0 0);
+  --muted: oklch(0.21 0 0);
+  --muted-foreground: oklch(0.6 0 0); /* neutral medium gray */
+  --accent: oklch(0.62 0.14 38);
+  --accent-foreground: oklch(0.97 0.01 80);
+  --destructive: oklch(0.58 0.18 18);
+  --destructive-foreground: oklch(0.97 0.01 80);
   --border: oklch(0.26 0 0);
-  --input: oklch(0.2 0 0);
-  --ring: oklch(0.75 0.18 142);
+  --input: oklch(0.24 0 0);
+  --ring: oklch(0.62 0.14 38);
 
   /* Signal category colors — dark mode */
-  --signal-trends: oklch(0.75 0.18 142);
-  --signal-complaints: oklch(0.72 0.19 27);
-  --signal-indie: oklch(0.72 0.16 264);
-  --signal-data: oklch(0.75 0.15 55);
+  --signal-trends: oklch(0.62 0.14 145);
+  --signal-complaints: oklch(0.62 0.16 22);
+  --signal-indie: oklch(0.56 0.1 264);
+  --signal-data: oklch(0.65 0.12 55);
 
   /* Semantic status */
-  --success: oklch(0.65 0.16 145);
-  --success-foreground: oklch(0.1 0 0);
+  --success: oklch(0.58 0.14 145);
+  --success-foreground: oklch(0.97 0.01 80);
 
   --sidebar: oklch(0.12 0 0);
-  --sidebar-foreground: oklch(0.82 0 0);
-  --sidebar-primary: oklch(0.75 0.18 142);
-  --sidebar-primary-foreground: oklch(0.1 0 0);
-  --sidebar-accent: oklch(0.18 0 0);
-  --sidebar-accent-foreground: oklch(0.92 0 0);
+  --sidebar-foreground: oklch(0.85 0 0);
+  --sidebar-primary: oklch(0.62 0.14 38);
+  --sidebar-primary-foreground: oklch(0.97 0.01 80);
+  --sidebar-accent: oklch(0.21 0 0);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
   --sidebar-border: oklch(0.26 0 0);
-  --sidebar-ring: oklch(0.75 0.18 142);
+  --sidebar-ring: oklch(0.62 0.14 38);
 
   /* Chart palette — references signal tokens so they stay in sync */
   --chart-1: var(--signal-trends);
   --chart-2: var(--signal-complaints);
   --chart-3: var(--signal-indie);
   --chart-4: var(--signal-data);
-  --chart-5: oklch(0.65 0.12 300);
+  --chart-5: oklch(0.55 0.12 300);
+
+  /* Layout — flanks are the darkest layer, recessed behind center */
+  --column-flank: oklch(0.12 0 0);
 }
 
 @theme inline {
@@ -150,6 +162,7 @@
   --color-signal-data: var(--signal-data);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-column-flank: var(--column-flank);
 }
 
 @layer base {
@@ -170,6 +183,23 @@
     background: var(--border);
     border-radius: 2px;
   }
+}
+
+/* Hint pulse — runs twice on mount then stops. Used on collapsible affordances
+   to signal interactivity without looping forever. */
+@keyframes hint-pulse {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: var(--border);
+  }
+}
+.animate-hint-pulse {
+  animation: hint-pulse 0.9s ease-in-out 2;
+  animation-delay: 0.25s;
+  animation-fill-mode: backwards;
 }
 
 /* Boilerplate semantic token aliases — extends the shadcn token system with

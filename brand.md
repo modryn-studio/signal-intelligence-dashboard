@@ -20,7 +20,7 @@ A solo developer who knows how to build but doesn’t yet know what to build. Th
 ## Visual Rules
 
 - Color mode: Light and dark mode. Defaults to system preference. Toggle available in the dashboard header.
-- Fonts: Inter (body, headlines) + JetBrains Mono (badges, tags, code, timestamps).
+- Fonts: Inter (body, headlines) + JetBrains Mono (badges, tags, code, timestamps) + Playfair Display (daily question — serif italic in header).
 - Motion: Minimal. Subtle fade on load. Nothing that moves unless it has to.
 - Avoid: No fake testimonials, no stock photos, no popups, no gradients, no decorative illustrations.
 
@@ -28,33 +28,60 @@ A solo developer who knows how to build but doesn’t yet know what to build. Th
 
 ## Color System
 
-**Dark mode** (default at night):
+All tokens are defined in `src/app/globals.css`. Light and dark mode are separate token sets. `@theme inline` bridges them to Tailwind utility classes.
 
-| Name       | Value                | Role                                       |
-| ---------- | -------------------- | ------------------------------------------ |
-| Accent     | oklch(0.75 0.18 142) | Primary — green signal color, CTAs, key UI |
-| Secondary  | oklch(0.72 0.19 27)  | Orange-red — warnings, contrarian markers  |
-| Background | oklch(0.10 0 0)      | Page background — near black               |
-| Text       | oklch(0.92 0 0)      | Body text — near white                     |
-| Muted      | oklch(0.65 0 0)      | Secondary text, borders, placeholders      |
-| Border     | oklch(0.26 0 0)      | Dividers, input outlines                   |
+**Light mode** — warm cream palette, burnt orange as primary action color:
 
-**Light mode** (readable in bright daylight):
+| Token                | Value                 | Role                                        |
+| -------------------- | --------------------- | ------------------------------------------- |
+| `--background`       | oklch(0.985 0.008 80) | Header + center column — near-white warm    |
+| `--card`             | oklch(0.94 0.013 80)  | Panel/card surface                          |
+| `--foreground`       | oklch(0.18 0.02 55)   | Body text — warm near-black                 |
+| `--primary`          | oklch(0.52 0.14 38)   | Burnt orange — CTAs, filled buttons         |
+| `--muted-foreground` | oklch(0.45 0.02 60)   | Secondary text, timestamps, labels          |
+| `--border`           | oklch(0.84 0.015 75)  | Dividers, input outlines                    |
+| `--destructive`      | oklch(0.48 0.18 18)   | Errors, delete actions — redder than orange |
+| `--success`          | oklch(0.48 0.14 145)  | Success states (same hue as signal-trends)  |
 
-| Name       | Value                | Role                                         |
-| ---------- | -------------------- | -------------------------------------------- |
-| Accent     | oklch(0.52 0.18 142) | Primary — darker green for light bg contrast |
-| Secondary  | oklch(0.55 0.22 27)  | Orange-red — warnings, contrarian markers    |
-| Background | oklch(0.98 0 0)      | Page background — near white                 |
-| Text       | oklch(0.12 0 0)      | Body text — near black                       |
-| Muted      | oklch(0.42 0 0)      | Secondary text, placeholders                 |
-| Border     | oklch(0.86 0 0)      | Dividers, input outlines                     |
+**Dark mode** — war room at midnight. Same warmth, more urgency. Deep warm darks in oklch(0.12–0.17) with hue 55. Never cold grey. Never pure black:
+
+| Token                | Value                | Role                                                    |
+| -------------------- | -------------------- | ------------------------------------------------------- |
+| `--background`       | oklch(0.12 0.018 55) | Deep warm dark — not cold black, stays in warm hue      |
+| `--card`             | oklch(0.17 0.018 55) | Slightly lifted from background, enough separation      |
+| `--column-flank`     | oklch(0.15 0.04 55)  | Left and right columns sit between background and card  |
+| `--foreground`       | oklch(0.92 0.012 75) | Warm off-white — never pure white                       |
+| `--primary`          | oklch(0.62 0.14 38)  | Burnt orange — same hue as light, more luminance to pop |
+| `--muted-foreground` | oklch(0.65 0.015 60) | Timestamps, labels — readable but recessed              |
+| `--border`           | oklch(0.20 0.012 55) | Subtle, barely there — dividers whisper not shout       |
+| `--destructive`      | oklch(0.58 0.18 18)  | Redder than orange, lightened for dark bg               |
+| `--success`          | oklch(0.58 0.14 145) | Same hue shift as primary — lightened                   |
+
+**Signal category colors** — used for left-border accents, badges, and borders on signal cards:
+
+| Token                 | Light                | Dark                 | Category   |
+| --------------------- | -------------------- | -------------------- | ---------- |
+| `--signal-trends`     | oklch(0.48 0.14 145) | oklch(0.62 0.14 145) | Trends     |
+| `--signal-complaints` | oklch(0.48 0.16 22)  | oklch(0.62 0.16 22)  | Complaints |
+| `--signal-indie`      | oklch(0.50 0.16 264) | oklch(0.64 0.16 264) | Indie      |
+| `--signal-data`       | oklch(0.52 0.12 55)  | oklch(0.65 0.12 55)  | Data       |
+
+Chart tokens (`--chart-1` through `--chart-4`) reference signal tokens — single source of truth.
+
+**Layout tokens:**
+
+| Token            | Light                 | Dark                | Role                                    |
+| ---------------- | --------------------- | ------------------- | --------------------------------------- |
+| `--background`   | oklch(0.985 0.008 80) | oklch(0.12 0.04 55) | Header + center column (section 2)      |
+| `--column-flank` | oklch(0.96 0.013 80)  | oklch(0.15 0.04 55) | Section 1 + section 3 — slightly darker |
 
 Color rules:
 
-- Competitors in this space (Exploding Topics, Treendly) own blue and purple territory. Avoid entirely.
-- No gradients. No blue of any shade in brand chrome.
-- Accent green is the single identity color — it anchors both modes.
+- Burnt orange is the identity color in both modes. In light mode it's grounded and warm. In dark mode it's sharper and more luminous — same hue (38), higher lightness.
+- `--signal-complaints` hue (22) ≠ `--primary` hue (38). Complaints category dots must not look like action buttons.
+- Competitors in this space (Exploding Topics, Treendly) own blue and purple. Avoid entirely in brand chrome.
+- No gradients. No blue of any shade.
+- `bg-muted` is a surface color (nearly background). `text-muted` is therefore invisible on light backgrounds. Always use `text-muted-foreground` for secondary text.
 
 ---
 
@@ -62,7 +89,7 @@ Color rules:
 
 **Direction:** Single letterform — the S in a sharp, monospace-adjacent style. Clean. No container.
 
-**Primary color:** Accent — oklch(0.75 0.18 142)
+**Primary color:** Burnt orange in both modes — `oklch(0.52 0.14 38)` in light, `oklch(0.62 0.14 38)` in dark. Same hue, higher luminance in dark mode.
 
 **Background:** Transparent — no container, no badge, no circle
 
