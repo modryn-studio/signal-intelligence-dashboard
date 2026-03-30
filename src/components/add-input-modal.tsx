@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { localDateStr } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,6 +71,7 @@ export function AddInputModal({
           url: url.trim() || null,
           notes: notes.trim() || null,
           tags: [],
+          date: localDateStr(),
         }),
       });
       if (!res.ok) throw new Error('Failed to save');

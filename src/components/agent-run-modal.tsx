@@ -55,23 +55,16 @@ interface Props {
   open: boolean;
   question: string;
   onClose: () => void;
-  onRun: () => Promise<{ logged: number }>;
+  onRun: (signal: AbortSignal) => Promise<{ logged: number }>;
   onDeepEvaluate?: () => void;
-  isPrewarming?: boolean;
 }
 
-export function AgentRunModal({
-  open,
-  question,
-  onClose,
-  onRun,
-  onDeepEvaluate,
-  isPrewarming,
-}: Props) {
-  const [stepIndex, setStepIndex] = useState(0); // which step is currently active
+export function AgentRunModal({ open, question, onClose, onRun, onDeepEvaluate }: Props) {
+  const [stepIndex, setStepIndex] = useState(0);
   const [result, setResult] = useState<{ logged: number } | null>(null);
   const [error, setError] = useState(false);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Reset and kick off run each time modal opens
   useEffect(() => {
@@ -81,24 +74,29 @@ export function AgentRunModal({
     setError(false);
     setStepIndex(0);
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     // Schedule timed step advances
     const t1 = setTimeout(() => setStepIndex((s) => Math.max(s, 1)), STEP_ADVANCE_AT[1]);
     const t2 = setTimeout(() => setStepIndex((s) => Math.max(s, 2)), STEP_ADVANCE_AT[2]);
     timersRef.current = [t1, t2];
 
-    onRun()
+    onRun(controller.signal)
       .then((data) => {
         timersRef.current.forEach(clearTimeout);
-        setStepIndex(STEPS.length); // all steps done
+        setStepIndex(STEPS.length);
         setResult(data);
       })
-      .catch(() => {
+      .catch((err) => {
         timersRef.current.forEach(clearTimeout);
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         setError(true);
       });
 
     return () => {
       timersRef.current.forEach(clearTimeout);
+      abortRef.current?.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -116,77 +114,97 @@ export function AgentRunModal({
     <Dialog
       open={open}
       onOpenChange={(v) => {
-        if (!v && isDone) onClose();
+        if (!v) {
+          abortRef.current?.abort();
+          onClose();
+        }
       }}
     >
-      <DialogContent showCloseButton={isDone || error} className="max-w-sm gap-0 p-6">
+      <DialogContent showCloseButton={true} className="max-w-sm gap-0 p-0">
         <DialogTitle className="sr-only">Run Agent</DialogTitle>
-        {/* Question */}
-        <div className="border-border mb-5 border-b pb-4">
-          <p className="text-muted-foreground mb-1 font-mono text-[10px] tracking-widest uppercase">
-            Today&apos;s question
-          </p>
-          <p className="text-foreground text-sm leading-snug italic">&ldquo;{question}&rdquo;</p>
+        {/* Header */}
+        <div className="border-border border-b px-5 py-4">
+          <p className="text-foreground font-mono text-sm tracking-widest uppercase">Run Agent</p>
         </div>
-
-        {/* Steps */}
-        <div className="flex flex-col gap-4">
-          {STEPS.map((step, i) => (
-            <StepRow key={step.label} step={step} status={stepStatuses[i]} />
-          ))}
-        </div>
-
-        {/* Result / error */}
-        {isDone && (
-          <div className="border-border mt-5 border-t pt-4">
-            <p className="text-accent font-mono text-sm">
-              {result!.logged === 0
-                ? 'No new signals matched today.'
-                : `${result!.logged} signal${result!.logged === 1 ? '' : 's'} logged.`}
+        <div className="p-6">
+          {/* Question */}
+          <div className="border-border mb-5 border-b pb-4">
+            <p className="text-muted-foreground mb-1 font-mono text-[10px] tracking-widest uppercase">
+              Today&apos;s question
             </p>
-            <div className="mt-3 flex flex-col gap-2">
-              {onDeepEvaluate && result!.logged > 0 && (
-                <Button
-                  onClick={() => {
-                    onClose();
-                    onDeepEvaluate();
-                  }}
-                  size="sm"
-                  className="w-full font-mono text-xs tracking-wider"
-                >
-                  {isPrewarming && (
-                    <span className="bg-primary/70 mr-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full" />
-                  )}
-                  &rarr; Deep evaluate
-                </Button>
-              )}
+            <p className="text-foreground text-sm leading-snug italic">&ldquo;{question}&rdquo;</p>
+          </div>
+
+          {/* Steps */}
+          <div className="flex flex-col gap-4">
+            {STEPS.map((step, i) => (
+              <StepRow key={step.label} step={step} status={stepStatuses[i]} />
+            ))}
+          </div>
+
+          {/* Cancel while running */}
+          {isRunning && (
+            <div className="mt-5">
               <Button
                 onClick={onClose}
                 size="sm"
-                variant={onDeepEvaluate && result!.logged > 0 ? 'outline' : 'default'}
-                className="w-full font-mono text-xs tracking-wider"
+                variant="ghost"
+                className="text-muted-foreground hover:text-foreground w-full font-mono text-xs tracking-wider"
               >
-                View signals
+                Cancel
               </Button>
             </div>
-          </div>
-        )}
+          )}
 
-        {error && (
-          <div className="border-border mt-5 border-t pt-4">
-            <p className="text-destructive font-mono text-sm">
-              Something went wrong. Refresh and try again.
-            </p>
-            <Button
-              onClick={onClose}
-              size="sm"
-              variant="outline"
-              className="mt-3 w-full font-mono text-xs tracking-wider"
-            >
-              Close
-            </Button>
-          </div>
-        )}
+          {/* Result / error */}
+          {isDone && (
+            <div className="border-border mt-5 border-t pt-4">
+              <p className="text-accent font-mono text-sm">
+                {result!.logged === 0
+                  ? 'No new signals matched today.'
+                  : `${result!.logged} signal${result!.logged === 1 ? '' : 's'} logged.`}
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                {onDeepEvaluate && result!.logged > 0 && (
+                  <Button
+                    onClick={() => {
+                      onClose();
+                      onDeepEvaluate();
+                    }}
+                    size="sm"
+                    className="w-full font-mono text-xs tracking-wider"
+                  >
+                    &rarr; Deep evaluate
+                  </Button>
+                )}
+                <Button
+                  onClick={onClose}
+                  size="sm"
+                  variant={onDeepEvaluate && result!.logged > 0 ? 'outline' : 'default'}
+                  className="w-full font-mono text-xs tracking-wider"
+                >
+                  View signals
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="border-border mt-5 border-t pt-4">
+              <p className="text-destructive font-mono text-sm">
+                Something went wrong. Refresh and try again.
+              </p>
+              <Button
+                onClick={onClose}
+                size="sm"
+                variant="outline"
+                className="mt-3 w-full font-mono text-xs tracking-wider"
+              >
+                Close
+              </Button>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

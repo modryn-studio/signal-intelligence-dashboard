@@ -1,9 +1,10 @@
 'use client';
 
-import useSWR from 'swr';
+import useSWR, { mutate as globalMutate } from 'swr';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { AddTruthModal } from '@/components/add-truth-modal';
+import { ValidateThesisModal } from '@/components/validate-thesis-modal';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +28,7 @@ interface ContrarianTruth {
   conviction_level: 1 | 2 | 3 | 4 | 5;
   status: Status;
   supporting_observations: number[];
+  proven_market?: string;
   created_at: string;
   updated_at: string;
 }
@@ -182,6 +184,14 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
                 &ldquo;{truth.thesis}&rdquo;
               </p>
 
+              {truth.proven_market && (
+                <p className="text-muted-foreground/60 mt-1 font-mono text-[10px] leading-snug">
+                  {truth.proven_market.length > 80
+                    ? truth.proven_market.slice(0, 80) + '…'
+                    : truth.proven_market}
+                </p>
+              )}
+
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span
                   className={`rounded border px-1.5 py-0.5 font-mono text-[10px] ${styles.classes}`}
@@ -215,15 +225,23 @@ function TruthCard({ truth, onUpdate }: { truth: ContrarianTruth; onUpdate: () =
               {/* Actions — shown on hover; always visible on touch */}
               {truth.status !== 'invalidated' && (
                 <div className="touch:opacity-100 mt-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                  {truth.status !== 'validated' && (
-                    <button
-                      onClick={() => setAdvanceDialogOpen(true)}
-                      disabled={updating}
-                      className="text-muted-foreground hover:text-foreground/60 border-border hover:border-muted-foreground/60 rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
-                    >
-                      Advance →
-                    </button>
-                  )}
+                  {truth.status !== 'validated' &&
+                    (() => {
+                      const advanceBlocked = truth.status === 'confident' && !truth.proven_market;
+                      return (
+                        <button
+                          onClick={() => !advanceBlocked && setAdvanceDialogOpen(true)}
+                          disabled={updating || advanceBlocked}
+                          className={`text-muted-foreground border-border rounded border px-2 py-0.5 font-mono text-[10px] transition-colors ${
+                            advanceBlocked
+                              ? 'cursor-not-allowed opacity-30'
+                              : 'hover:text-foreground/60 hover:border-muted-foreground/60'
+                          }`}
+                        >
+                          Advance →
+                        </button>
+                      );
+                    })()}
                   <button
                     onClick={() => setInvalidateDialogOpen(true)}
                     disabled={updating}
@@ -269,7 +287,13 @@ export function ContrarianTruthsPanel() {
     refreshInterval: 60000,
   });
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [validateOpen, setValidateOpen] = useState(false);
   const [filter, setFilter] = useState<Status | 'active'>('active');
+
+  const activeTruths = (truths ?? []).filter(
+    (t): t is ContrarianTruth & { status: 'forming' | 'confident' } =>
+      t.status === 'forming' || t.status === 'confident'
+  );
 
   const filtered = (truths || []).filter((t) => {
     if (filter === 'active') return t.status === 'forming' || t.status === 'confident';
@@ -290,17 +314,29 @@ export function ContrarianTruthsPanel() {
             Contrarian Theses
           </h2>
           <p className="text-muted-foreground/60 dark:text-muted-foreground/80 mt-0.5 text-xs">
-            {counts['forming'] || 0} forming · {counts['confident'] || 0} confident ·{' '}
+            {counts['forming'] || 0} forming &middot; {counts['confident'] || 0} confident &middot;{' '}
             {counts['validated'] || 0} validated
           </p>
         </div>
-        <Button
-          onClick={() => setAddModalOpen(true)}
-          size="sm"
-          className="bg-primary text-primary-foreground h-7 px-3 font-mono text-xs tracking-wider"
-        >
-          + Form Thesis
-        </Button>
+        <div className="flex items-center gap-2">
+          {activeTruths.length > 0 && (
+            <Button
+              onClick={() => setValidateOpen(true)}
+              size="sm"
+              variant="outline"
+              className="h-7 px-3 font-mono text-xs tracking-wider"
+            >
+              Validate &rarr;
+            </Button>
+          )}
+          <Button
+            onClick={() => setAddModalOpen(true)}
+            size="sm"
+            className="bg-primary text-primary-foreground h-7 px-3 font-mono text-xs tracking-wider"
+          >
+            + Form Thesis
+          </Button>
+        </div>
       </div>
 
       {/* Filter tabs */}
@@ -379,6 +415,13 @@ export function ContrarianTruthsPanel() {
       <AddTruthModal
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
+        onSaved={() => mutate()}
+      />
+
+      <ValidateThesisModal
+        open={validateOpen}
+        onClose={() => setValidateOpen(false)}
+        truths={activeTruths}
         onSaved={() => mutate()}
       />
     </div>

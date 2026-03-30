@@ -195,9 +195,17 @@ async function fetchReddit(subreddit: string): Promise<FetchedItem[]> {
   }
 }
 
-export async function POST(_req: Request): Promise<Response> {
+export async function POST(req: Request): Promise<Response> {
   const ctx = log.begin();
   try {
+    // Client passes today's local date so agent stamps signals correctly regardless of server timezone
+    let today: string;
+    try {
+      const body = (await req.json()) as { today?: string };
+      today = body.today || new Date().toISOString().split('T')[0];
+    } catch {
+      today = new Date().toISOString().split('T')[0];
+    }
     const question = getTodayQuestion();
     log.info(ctx.reqId, 'Fetching sources', { question });
 
@@ -271,20 +279,20 @@ Respond with ONLY valid JSON, no markdown fences, no explanation:
         }));
     }
 
-    const today = new Date().toISOString().split('T')[0];
-
-    // Pre-load URLs already logged today to avoid duplicates on repeated runs
+    // Pre-load URLs and titles already logged today to avoid duplicates on repeated runs
     const existing = (await sql`
-      SELECT url FROM signal_inputs WHERE date = ${today} AND url IS NOT NULL
-    `) as { url: string }[];
-    const existingUrls = new Set(existing.map((r) => r.url));
+      SELECT url, title FROM signal_inputs WHERE date = ${today}
+    `) as { url: string | null; title: string }[];
+    const existingUrls = new Set(existing.filter((r) => r.url).map((r) => r.url as string));
+    const existingTitles = new Set(existing.map((r) => r.title));
 
     let logged = 0;
 
     for (const sel of selected) {
       const item = itemMap.get(sel.id);
       if (!item) continue;
-      if (item.url && existingUrls.has(item.url)) continue; // already logged today
+      if (item.url && existingUrls.has(item.url)) continue;
+      if (existingTitles.has(item.title)) continue;
       const tags = ['agent'];
       await sql`
         INSERT INTO signal_inputs (date, source, source_category, title, url, notes, tags)

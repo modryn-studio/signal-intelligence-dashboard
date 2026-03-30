@@ -5,6 +5,7 @@ import { Zap, Eye, Target } from 'lucide-react';
 import { SignalFeed } from '@/components/signal-feed';
 import { ObservationsPanel } from '@/components/observations-panel';
 import { ContrarianTruthsPanel } from '@/components/contrarian-truths-panel';
+import { localDateStr } from '@/lib/utils';
 
 type Tab = 'signals' | 'observations' | 'theses';
 
@@ -16,13 +17,23 @@ const TABS = [
 
 export function DashboardLayout() {
   const [activeTab, setActiveTab] = useState<Tab>('signals');
+  const today = localDateStr();
+  const [selectedDate, setSelectedDate] = useState(today);
+  const isToday = selectedDate === today;
+
+  const shiftDay = (delta: number) => {
+    const d = new Date(selectedDate + 'T12:00:00');
+    d.setDate(d.getDate() + delta);
+    const next = localDateStr(d);
+    if (next <= today) setSelectedDate(next);
+  };
 
   return (
     <main className="flex flex-1 flex-col overflow-hidden">
       {/* ── Desktop: 3-column grid ── */}
       <div className="divide-border hidden h-full lg:grid lg:grid-cols-[1fr_1fr_1fr] lg:divide-x">
         <section className="bg-column-flank flex h-full flex-col overflow-hidden p-5">
-          <SignalFeed />
+          <SignalFeed selectedDate={selectedDate} isToday={isToday} shiftDay={shiftDay} />
         </section>
         <section className="flex h-full flex-col overflow-hidden p-5">
           <ObservationsPanel />
@@ -36,7 +47,9 @@ export function DashboardLayout() {
       <div className="flex flex-1 flex-col overflow-hidden lg:hidden">
         {/* Active panel */}
         <div className="flex-1 overflow-hidden p-4">
-          {activeTab === 'signals' && <SignalFeed />}
+          {activeTab === 'signals' && (
+            <SignalFeed selectedDate={selectedDate} isToday={isToday} shiftDay={shiftDay} />
+          )}
           {activeTab === 'observations' && <ObservationsPanel />}
           {activeTab === 'theses' && <ContrarianTruthsPanel />}
         </div>

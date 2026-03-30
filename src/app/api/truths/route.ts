@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+// Ensure proven_market column exists — idempotent, safe on every cold start
+void sql`ALTER TABLE contrarian_truths ADD COLUMN IF NOT EXISTS proven_market TEXT`.catch(() => {});
+
 export async function GET() {
   try {
     const truths = await sql`
@@ -43,7 +46,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, conviction_level, status, thesis, appendObservationId } = body;
+    const { id, conviction_level, status, thesis, proven_market, appendObservationId } = body;
 
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
@@ -62,9 +65,10 @@ export async function PATCH(request: NextRequest) {
       [truth] = await sql`
         UPDATE contrarian_truths
         SET
-          thesis = COALESCE(${thesis || null}, thesis),
-          conviction_level = COALESCE(${conviction_level || null}, conviction_level),
-          status = COALESCE(${status || null}, status),
+          thesis = COALESCE(${thesis ?? null}, thesis),
+          conviction_level = COALESCE(${conviction_level ?? null}, conviction_level),
+          status = COALESCE(${status ?? null}, status),
+          proven_market = COALESCE(${proven_market ?? null}, proven_market),
           updated_at = NOW()
         WHERE id = ${id}
         RETURNING *

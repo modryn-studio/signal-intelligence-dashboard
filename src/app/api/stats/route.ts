@@ -1,9 +1,11 @@
-import { NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
+import { NextRequest, NextResponse } from 'next/server';
+import { sql } from '@/lib/db';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const today = new Date().toISOString().split('T')[0]
+    // Client sends ?today=YYYY-MM-DD in local time; fall back to UTC only as a last resort
+    const clientToday = request.nextUrl.searchParams.get('today');
+    const today = clientToday || new Date().toISOString().split('T')[0];
 
     const [
       todayInputs,
@@ -30,7 +32,7 @@ export async function GET() {
         GROUP BY date
         ORDER BY date DESC
       `,
-    ])
+    ]);
 
     return NextResponse.json({
       today_inputs: Number(todayInputs[0]?.count || 0),
@@ -39,9 +41,9 @@ export async function GET() {
       total_truths: Number(totalTruths[0]?.count || 0),
       category_breakdown: categoryBreakdown,
       recent_streak: recentStreak,
-    })
+    });
   } catch (error) {
-    console.error('[stats] GET error:', error)
-    return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 })
+    console.error('[stats] GET error:', error);
+    return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 });
   }
 }

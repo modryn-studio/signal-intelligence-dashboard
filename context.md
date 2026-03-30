@@ -49,35 +49,41 @@ Current: email-only — no payment gate.
 - `/` → Main dashboard (3-column signal intelligence layout)
 - `/api/inputs` → CRUD for signal inputs
 - `/api/observations` → CRUD for observations (stores `related_input_ids INT[]` linking back to signal inputs)
-- `/api/truths` → CRUD for contrarian truths (thesis, conviction level, status lifecycle, `supporting_observations INT[]`)
+- `/api/truths` → CRUD for contrarian truths (thesis, conviction level, status lifecycle, `supporting_observations INT[]`, `proven_market TEXT`)
 - `/api/stats` → Aggregate stats for dashboard header
 - `/api/digest` → Weekly digest generation
 - `/api/feedback` → Feedback + newsletter signup (boilerplate standard)
 - `/api/agent/run` → POST — fetches HN, Product Hunt, Indie Hackers, r/SaaS, r/Entrepreneur; filters via Claude; inserts to signal_inputs tagged `agent`
 - `/api/agent/evaluate` → POST — fetches actual source content (Reddit JSON, HN Algolia, article HTML), calls Claude with web search, returns `EvaluationResult[]` + `Synthesis`
+- `/api/agent/propose` → POST — reads last 30 observations (all dates), calls Claude once, returns `{ thesis, supporting_observations, conviction_level, reasoning }` — powers the Synthesize button in Section 2
 
-## Current State (as of March 26, 2026)
+## Current State (as of March 30, 2026)
 
-Insight chain is fully wired: Signal → Observation → Thesis.
+Full insight chain is wired: Signal → Observation → Thesis → Validate.
+
+**Section 1 — Signal Feed**
 
 - Signal cards have a hover-revealed "→ Observe" button. Opens AddObservationModal pre-filled with the signal title and `related_input_ids`.
-- Observation cards have a hover-revealed "→ Add to thesis" button. Opens ObservationTruthPickerModal — a picker of active theses with a "+ Create new thesis" escape hatch at the bottom.
+- Agent dropdown ("Agent ▾") — two actions: Run Agent, Deep Evaluate.
+- **Run Agent** — fetches HN, Product Hunt, Indie Hackers, r/SaaS, r/Entrepreneur; filters via Claude; inserts to signal_inputs tagged `agent`.
+- **Deep Evaluate** — opens EvaluateSignalsModal. Fetches real source content per signal, calls Claude (claude-sonnet-4-6) with `web_search_20260209` tool (max 3 uses). Returns verdicts (observe/skip/delete) + Synthesis block (priority signals, pattern, thesis candidate). Results cached in localStorage by date.
+- EvaluateSignalsModal "✓ Accept top signals + form thesis" button: saves priority signals as observations → POSTs thesis to `/api/truths` with linked obs IDs.
+
+**Section 2 — Observations**
+
+- Observation cards have a hover-revealed "→ Add to thesis" button → ObservationTruthPickerModal.
 - PATCH `/api/truths` accepts `appendObservationId` — uses `array_append()` to merge without overwriting.
+- **Synthesize button** appears in the Section 2 header when `observations.length >= 3`. Opens SynthesizeObservationsModal — calls `/api/agent/propose`, reads last 30 obs across all dates, returns thesis proposal + supporting obs + conviction level. Day-scoped localStorage cache; Re-run ↺ in footer; AbortController on close. After thesis created, cache clears.
+
+**Section 3 — Contrarian Theses**
+
 - Truth cards show `supporting_observations.length` as "N obs".
-
-Agent dropdown ("Agent ▾") in signal feed header — two actions:
-
-- **Run Agent** — fetches and filters signals via Claude, shows step-progress modal, offers "→ Deep evaluate" shortcut on completion.
-- **Deep Evaluate** — opens EvaluateSignalsModal. Fetches real source content per signal, calls Claude (claude-sonnet-4-6) with `web_search_20260209` tool (max 3 uses per run). Returns per-card verdicts (observe/skip/delete) + a Synthesis block (priority signals, pattern, thesis candidate). Results cached in localStorage by date; Re-run button force-refreshes.
-
-EvaluateSignalsModal one-click loop:
-
-- Collapsible Analysis panel shows synthesis (priority, pattern, thesis candidate).
-- "✓ Accept top signals + form thesis" button: saves priority signal(s) as observations → POSTs to `/api/truths` with linked observation IDs. One click closes the signal → observation → thesis chain.
-- Individual cards: Accept (saves observation) or Delete.
-- Filter tabs: observe / skip / delete / all.
-
-Evaluate prompt lens: "Where is something growing fast but being served poorly?" OBSERVE requires evidence of BOTH growth (adoption, scale, engagement numbers) AND poor service (no dominant solution, DIY workarounds, people still stuck). proposed_body is two grounded sentences — growth evidence, then service failure — no assertions beyond what source content confirms. thesis_candidate is a contrarian belief about market misconfiguration, not a product pitch.
+- Truth cards show `proven_market` (truncated to 80 chars) below the thesis text when set.
+- **Validate → button** appears in the Section 3 header when any `forming` or `confident` thesis exists. Opens ValidateThesisModal.
+- **ValidateThesisModal** — thesis picker (auto-selects if only one), editable `proven_market` text field, lifestyle filter (3 yes/no: adds freedom / can build alone / plays to skills), Marc Lou path (shown only when all 3 pass). Footer: "Save & Advance" (advances status when lifestyle passes) / "Save" (saves proven_market only).
+- **Advance → gating**: on `confident` theses, Advance → is disabled if `proven_market` is blank. Must validate before calling it Validated.
+- `proven_market TEXT` column added to `contrarian_truths` — migrated automatically at cold-start via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
+- Old Socratic "Form thesis" inline dialog removed. Section 2's Synthesize button is the easy path to thesis creation; "+ Form Thesis" in Section 3 header is the manual path.
 
 Phase 2 is planned but on hold. Using the system for 3–5 days to validate the chain produces insight before improving the agent. Tracked in GitHub Issue #2.
 

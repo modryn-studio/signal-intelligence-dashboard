@@ -7,6 +7,7 @@ import { getQuestionForDate, localDateStr } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { AddObservationModal } from '@/components/add-observation-modal';
 import { ObservationTruthPickerModal } from '@/components/observation-truth-picker-modal';
+import { SynthesizeObservationsModal } from '@/components/synthesize-observations-modal';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +24,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 function useActiveDays() {
   const { data } = useSWR<{ recent_streak: { date: string; count: number }[] }>(
-    '/api/stats',
+    `/api/stats?today=${localDateStr()}`,
     fetcher,
     { refreshInterval: 60000 }
   );
@@ -61,15 +62,23 @@ function ObservationCard({
                   day: 'numeric',
                 })}
               </span>
-              {obs.tags?.map((tag) => (
-                <span key={tag} className="text-muted-foreground font-mono text-[10px]">
-                  #{tag}
-                </span>
-              ))}
             </div>
 
             {/* Actions – shown on hover; always visible on touch */}
-            <div className="touch:opacity-100 mt-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="touch:opacity-100 mt-2 flex flex-wrap items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+              {obs.related_inputs
+                ?.filter((ri) => ri.url)
+                .map((ri) => (
+                  <a
+                    key={ri.id}
+                    href={ri.url!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-foreground/60 border-border hover:border-muted-foreground/60 rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
+                  >
+                    &rarr; Source
+                  </a>
+                ))}
               <button
                 onClick={() => onAddToThesis(obs.id)}
                 className="text-muted-foreground hover:text-foreground/60 border-border hover:border-muted-foreground/60 rounded border px-2 py-0.5 font-mono text-[10px] transition-colors"
@@ -112,11 +121,10 @@ export function ObservationsPanel() {
   const { data: observations, mutate } = useSWR<Observation[]>(
     '/api/observations?limit=20',
     fetcher,
-    {
-      refreshInterval: 30000,
-    }
+    { refreshInterval: 30000 }
   );
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [synthesizeOpen, setSynthesizeOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerObsId, setPickerObsId] = useState<number | null>(null);
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
@@ -164,13 +172,25 @@ export function ObservationsPanel() {
             Observations
           </h2>
         </div>
-        <Button
-          onClick={() => setAddModalOpen(true)}
-          size="sm"
-          className="bg-primary text-primary-foreground h-7 px-3 font-mono text-xs tracking-wider"
-        >
-          + Capture
-        </Button>
+        <div className="flex items-center gap-2">
+          {observations && observations.length >= 3 && (
+            <Button
+              onClick={() => setSynthesizeOpen(true)}
+              variant="outline"
+              size="sm"
+              className="h-7 px-3 font-mono text-xs tracking-wider"
+            >
+              Synthesize
+            </Button>
+          )}
+          <Button
+            onClick={() => setAddModalOpen(true)}
+            size="sm"
+            className="bg-primary text-primary-foreground h-7 px-3 font-mono text-xs tracking-wider"
+          >
+            + Capture
+          </Button>
+        </div>
       </div>
 
       {/* Observations list */}
@@ -253,6 +273,12 @@ export function ObservationsPanel() {
         observationId={pickerObsId}
         onClose={() => setPickerOpen(false)}
         onSaved={() => mutate()}
+      />
+
+      <SynthesizeObservationsModal
+        open={synthesizeOpen}
+        onClose={() => setSynthesizeOpen(false)}
+        onThesisCreated={() => mutate()}
       />
     </div>
   );

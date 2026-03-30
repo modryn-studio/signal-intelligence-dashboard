@@ -5,14 +5,13 @@ import { useState } from 'react';
 import type { SignalInput } from '@/lib/types';
 import { SOURCE_CATEGORIES } from '@/lib/types';
 import { Button } from '@/components/ui/button';
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon } from 'lucide-react';
 import { AddInputModal } from '@/components/add-input-modal';
 import { AddObservationModal } from '@/components/add-observation-modal';
 import { AgentRunModal } from '@/components/agent-run-modal';
@@ -28,12 +27,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { getTodayQuestion, localDateStr } from '@/lib/utils';
-
-// Must match the cache key used in evaluate-signals-modal.tsx
-function getTodayEvalCacheKey() {
-  return 'signal-eval-' + localDateStr();
-}
+import { getTodayQuestion, getQuestionForDate } from '@/lib/utils';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -85,7 +79,7 @@ function InputCard({
   const cat = input.source_category as Category;
   const styles = CATEGORY_STYLES[cat] || CATEGORY_STYLES.trends;
   const [deleting, setDeleting] = useState(false);
-  const [notesExpanded, setNotesExpanded] = useState(false);
+  const [notesExpanded, setNotesExpanded] = useState(true);
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -197,38 +191,34 @@ function InputCard({
   );
 }
 
-export function SignalFeed() {
-  const today = localDateStr();
-  const [selectedDate, setSelectedDate] = useState(today);
-  const isToday = selectedDate === today;
+interface SignalFeedProps {
+  selectedDate: string;
+  isToday: boolean;
+  shiftDay: (delta: number) => void;
+}
+
+export function SignalFeed({ selectedDate, isToday, shiftDay }: SignalFeedProps) {
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
-  const todayQuestion = getTodayQuestion();
+  const todayQuestion = isToday ? getTodayQuestion() : getQuestionForDate(selectedDate);
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [evalPrewarming, setEvalPrewarming] = useState(false);
   const [addCategory, setAddCategory] = useState<Category>('trends');
   const [agentModalOpen, setAgentModalOpen] = useState(false);
-  const [evaluateModalOpen, setEvaluateModalOpen] = useState(false);
+  const [evaluateOpen, setEvaluateOpen] = useState(false);
   const [observeModalOpen, setObserveModalOpen] = useState(false);
-  const [sourcesExpanded, setSourcesExpanded] = useState(true);
+  const [sourcesExpanded, setSourcesExpanded] = useState(false);
   const [observePrefill, setObservePrefill] = useState<
     { body: string; relatedInputIds: number[]; title?: string; tags?: string } | undefined
   >(undefined);
 
   const openObserveModal = (input: SignalInput) => {
     setObservePrefill({
-      body: input.title,
+      // Signal title → Pattern field (user rewrites it to name the pattern)
+      title: input.title,
+      // Claude's note → Details field (supporting context/evidence)
+      body: input.notes ?? input.title,
       relatedInputIds: [input.id],
-      // Claude's insight note → suggested title
-      title: input.notes ?? undefined,
     });
     setObserveModalOpen(true);
-  };
-
-  const shiftDay = (delta: number) => {
-    const d = new Date(selectedDate + 'T12:00:00');
-    d.setDate(d.getDate() + delta);
-    const next = localDateStr(d);
-    if (next <= today) setSelectedDate(next);
   };
 
   const url =
@@ -243,39 +233,16 @@ export function SignalFeed() {
     setAddModalOpen(true);
   };
 
-  const runAgent = async (): Promise<{ logged: number }> => {
-    const res = await fetch('/api/agent/run', { method: 'POST' });
+  const runAgent = async (signal?: AbortSignal): Promise<{ logged: number }> => {
+    const res = await fetch('/api/agent/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ today: selectedDate }),
+      signal,
+    });
     if (!res.ok) throw new Error('Failed');
     const data = (await res.json()) as { logged: number };
     mutate();
-    if (data.logged > 0) {
-      // Pre-warm the evaluate cache so Deep Evaluate is fast (or instant) when opened
-      try {
-        if (!localStorage.getItem(getTodayEvalCacheKey())) {
-          setEvalPrewarming(true);
-          fetch('/api/agent/evaluate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({}),
-          })
-            .then(async (r) => {
-              if (!r.ok) return;
-              const entry = await r.json();
-              try {
-                localStorage.setItem(getTodayEvalCacheKey(), JSON.stringify(entry));
-              } catch {
-                /* quota */
-              }
-            })
-            .catch(() => {
-              /* silent fail */
-            })
-            .finally(() => setEvalPrewarming(false));
-        }
-      } catch {
-        /* localStorage unavailable */
-      }
-    }
     return data;
   };
 
@@ -326,42 +293,35 @@ export function SignalFeed() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size="sm"
-                className="border-border text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary dark:bg-card h-7 border bg-transparent px-3 font-mono text-xs tracking-wider"
-              >
-                Agent
-                <ChevronDownIcon className="ml-1 h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="font-mono text-xs">
-              <DropdownMenuItem
-                onSelect={() => setAgentModalOpen(true)}
-                disabled={!isToday}
-                className="font-mono text-xs"
-              >
-                Run Agent
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={() => setEvaluateModalOpen(true)}
-                disabled={!inputs || inputs.length === 0 || !isToday}
-                className="font-mono text-xs"
-              >
-                Deep Evaluate
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button
-            onClick={() => openAdd()}
-            disabled={!isToday}
-            size="sm"
-            className="bg-primary text-primary-foreground h-7 px-3 font-mono text-xs tracking-wider disabled:opacity-40"
-          >
-            + Log Input
-          </Button>
+          {isToday && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-3 font-mono text-xs tracking-wider"
+                >
+                  Agent
+                  <ChevronDownIcon className="ml-1 h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="font-mono text-xs">
+                <DropdownMenuItem onClick={() => setAgentModalOpen(true)}>
+                  Run Agent
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setEvaluateOpen(true)}>Evaluate</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {isToday && (
+            <Button
+              onClick={() => openAdd()}
+              size="sm"
+              className="bg-primary text-primary-foreground h-7 px-3 font-mono text-xs tracking-wider"
+            >
+              + Log Input
+            </Button>
+          )}
         </div>
       </div>
 
@@ -540,13 +500,12 @@ export function SignalFeed() {
         question={getTodayQuestion()}
         onClose={() => setAgentModalOpen(false)}
         onRun={runAgent}
-        onDeepEvaluate={() => setEvaluateModalOpen(true)}
-        isPrewarming={evalPrewarming}
+        onDeepEvaluate={() => setEvaluateOpen(true)}
       />
 
       <EvaluateSignalsModal
-        open={evaluateModalOpen}
-        onClose={() => setEvaluateModalOpen(false)}
+        open={evaluateOpen}
+        onClose={() => setEvaluateOpen(false)}
         onSignalDeleted={() => mutate()}
         onObservationSaved={() => mutate()}
       />

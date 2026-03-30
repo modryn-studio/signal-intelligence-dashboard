@@ -35,6 +35,13 @@ export interface Synthesis {
   thesis_candidate: string; // 1 sentence, 25 words max: the contrarian belief as a direct claim
 }
 
+// NDJSON stream chunk types
+export type StreamChunk =
+  | { type: 'question'; question: string; total: number }
+  | { type: 'result'; evaluation: EvaluationResult }
+  | { type: 'synthesis'; synthesis: Synthesis }
+  | { type: 'error'; message: string };
+
 // Fetch actual source content to give Claude real evidence, not just headlines.
 // Reddit: JSON API gives post body + top comments.
 // HN: Algolia items API gives story + top comments.
@@ -111,178 +118,250 @@ async function fetchContent(signal: SignalRow): Promise<string> {
   }
 }
 
-export async function POST(req: Request): Promise<Response> {
-  const ctx = log.begin();
-  try {
-    const body = (await req.json().catch(() => ({}))) as { date?: string };
-    const date = body.date ?? new Date().toISOString().split('T')[0];
+// Evaluate a single signal with its own Claude call.
+// Returns null if the Claude call fails (caller handles gracefully).
+async function evaluateOne(
+  client: Anthropic,
+  signal: SignalRow & { content: string },
+  question: string
+): Promise<EvaluationResult | null> {
+  const prompt = `You are a brutal signal filter. Most signals are noise. Your job is to find the 2–4 signals worth acting on — not to validate everything.
 
-    const rows = await sql`
-      SELECT id, title, url, notes, source, source_category
-      FROM signal_inputs
-      WHERE date = ${date}
-      ORDER BY id DESC
-    `;
-    const signals = rows as SignalRow[];
+Your lens: "Where is something growing fast AND being served poorly?"
 
-    if (signals.length === 0) {
-      return log.end(ctx, Response.json({ evaluations: [], question: getTodayQuestion() }), {
-        count: 0,
-      });
-    }
+OBSERVE — requires BOTH conditions, with hard evidence:
+A) GROWING: Specific numbers, scale, or momentum. Not "people complain" — cite the score, comment count, user count, cost figure, or trend data from the source content.
+B) POORLY SERVED: The current best solution demonstrably fails a large segment. Not "could be better" — evidence that people are stuck, building DIY workarounds, or the dominant tool explicitly doesn't cover this case.
 
-    log.info(ctx.reqId, 'Fetching source content', { signals: signals.length });
+If either condition is absent or only implied, do NOT mark observe.
 
-    // Read all source URLs in parallel — this is where the agent does the research
-    const withContent = await Promise.all(
-      signals.map(async (s) => ({ ...s, content: await fetchContent(s) }))
-    );
+SKIP: Has one dimension but not both. Interesting topic, weak evidence, or only partially relevant to today's question.
+DELETE: General news, solved problem, opinion piece, single anecdote, product announcement without evidence of pain, or off-topic.
 
-    const fetched = withContent.filter((s) => s.content.length > 0).length;
-    log.info(ctx.reqId, 'Content fetched', { fetched, total: signals.length });
-
-    const question = getTodayQuestion();
-
-    if (!process.env.ANTHROPIC_API_KEY) {
-      // Fallback: no API key — mark all as skip
-      const evaluations: EvaluationResult[] = signals.map((s) => ({
-        id: s.id,
-        title: s.title,
-        url: s.url,
-        source: s.source,
-        source_category: s.source_category,
-        recommendation: 'skip',
-        reasoning: 'No Anthropic API key configured.',
-      }));
-      return log.end(ctx, Response.json({ evaluations, question }), { count: 0 });
-    }
-
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-    const signalsForPrompt = withContent.map((s) => ({
-      ref: s.id, // numeric reference — use for priority_ids only, not for prose labels
-      title: s.title, // use this in all written descriptions
-      source: s.source,
-      category: s.source_category,
-      existing_note: s.notes,
-      // Trim content per signal to stay within context window
-      source_content: s.content ? s.content.slice(0, 1200) : null,
-    }));
-
-    const prompt = `You are a signal analyst. Your lens: "Where is something growing fast but being served poorly?"
-
-That is the only question that matters. Not: is there pain? Pain is everywhere. The question is: is adoption or demand growing in a space where the current solutions are clearly failing?
+Calibration: Expect roughly 10–20% observe, 40–50% skip, 30–50% delete. If you're about to mark something observe but you're not citing specific evidence from source_content for BOTH conditions, mark it skip instead.
 
 Today's focusing question: "${question}"
 
----
+Signal:
+${JSON.stringify({
+  ref: signal.id,
+  title: signal.title,
+  source: signal.source,
+  category: signal.source_category,
+  existing_note: signal.notes,
+  source_content: signal.content ? signal.content.slice(0, 1500) : null,
+})}
 
-OBSERVE — requires evidence of BOTH:
-A) Growing: adoption is increasing, complaints are multiplying, people are actively searching for alternatives, DIY workarounds are spreading, or numbers in the source show scale (points, comments, cost, users).
-B) Poorly served: no dominant solution exists, or the dominant solution is clearly wrong for a large segment — people are still stuck, still complaining, still building their own.
+${!signal.content ? 'source_content is empty — use web_search on the title before deciding. If you find no hard evidence of both growth AND poor service, mark skip.' : ''}
 
-Both must be present. Pain alone is not enough. Growth alone is not enough.
-
-SKIP: One dimension only — interesting but not the intersection. Or tangentially related to today's question.
-
-DELETE: Noise. Off-topic. A single anecdote. A solved problem with satisfied users.
-
-For each OBSERVE signal:
-- proposed_title: 10 words max. Name the gap at the intersection — what's growing, what's failing it.
-- proposed_body: 2 sentences. Sentence 1: the growth evidence (cite something specific from source — numbers, engagement, scale, spreading behavior). Sentence 2: the service failure (what exists, why it doesn't fit, what people do instead). No assertions you cannot confirm from the source content.
-- signal_type: the single dominant driver. Pick exactly one: "frustration" (primary evidence is pain/complaints), "growing-fast" (primary evidence is adoption/scale), "served-poorly" (primary evidence is solution failure/no dominant player), "contrarian" (the signal flips conventional wisdom about the market). Choose the one that is most clearly evidenced in the source.
-
-For signals where source_content is empty: use web_search on the title before deciding.
-
----
-
-Signals:
-${JSON.stringify(signalsForPrompt, null, 2)}
-
----
-
-Synthesize ONLY the observe-rated signals. One sentence per field. No hedging.
-- priority_ids: ref values of the 1–2 strongest signals — strongest means clearest evidence of both growth AND poor service. Max 2.
-- priority: ≤20 words. Name the signal(s) using exact title text. State the growth+service-failure intersection in one phrase.
-- patterns: ≤20 words. The structural theme across observe cards. If none: "No clear pattern."
-- thesis_candidate: ≤25 words. A contrarian belief this data supports. Something most people would push back on. Not a product idea — a belief about how a market is misconfigured.
-
-Use web_search once during synthesis only if you need to confirm whether a dominant solution already exists.
+For OBSERVE only:
+- proposed_title: ≤10 words. Name the gap — what's growing, what's failing it.
+- proposed_body: 2 sentences. Sentence 1: growth evidence (cite something specific from source_content — numbers, scale, behavior). Sentence 2: service failure (what exists, why it doesn't fit, what people do instead).
+- signal_type: exactly one of "frustration" | "growing-fast" | "served-poorly" | "contrarian"
 
 Respond with ONLY valid JSON, no markdown:
-{"evaluations":[{"ref":1,"recommendation":"observe","reasoning":"one sentence citing specific growth + service-failure evidence","proposed_title":"...","proposed_body":"...","signal_type":"frustration"},{"ref":2,"recommendation":"skip","reasoning":"one sentence"}],"synthesis":{"priority_ids":[1,3],"priority":"...","patterns":"...","thesis_candidate":"..."}}`;
+{"ref":${signal.id},"recommendation":"observe","reasoning":"one sentence citing specific evidence","proposed_title":"...","proposed_body":"...","signal_type":"frustration"}
+or
+{"ref":${signal.id},"recommendation":"skip","reasoning":"one sentence"}
+or
+{"ref":${signal.id},"recommendation":"delete","reasoning":"one sentence"}`;
 
-    log.info(ctx.reqId, 'Calling Claude for signal evaluation');
-
+  try {
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      tools: [
-        {
-          name: 'web_search',
-          type: 'web_search_20260209',
-          // Cap searches to 3 total per evaluation run — covers urlless signals + thesis verification
-          max_uses: 3,
-        },
-      ],
+      max_tokens: 512,
+      tools: signal.content
+        ? []
+        : [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
       messages: [{ role: 'user', content: prompt }],
     });
 
-    const webSearches = message.usage?.server_tool_use?.web_search_requests ?? 0;
-    if (webSearches > 0) log.info(ctx.reqId, 'Web searches fired', { webSearches });
-
-    // When web search runs, content may have multiple blocks (tool results + text).
-    // Always use the last text block — that's Claude's final response with the JSON.
-    const lastTextBlock = [...message.content].reverse().find((b) => b.type === 'text');
-    const rawText = lastTextBlock?.type === 'text' ? lastTextBlock.text.trim() : '{}';
-    // Claude sometimes wraps JSON in markdown fences despite instructions — strip them
+    const lastText = [...message.content].reverse().find((b) => b.type === 'text');
+    const rawText = lastText?.type === 'text' ? lastText.text.trim() : '{}';
     const raw = rawText
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```$/i, '')
       .trim();
     const parsed = JSON.parse(raw) as {
-      evaluations: Array<{
-        ref: number;
-        recommendation: string;
-        reasoning: string;
-        proposed_title?: string;
-        proposed_body?: string;
-        signal_type?: string;
-      }>;
-      synthesis?: Synthesis;
+      ref: number;
+      recommendation: string;
+      reasoning: string;
+      proposed_title?: string;
+      proposed_body?: string;
+      signal_type?: string;
     };
 
-    // Join Claude's verdicts with signal data for the response
-    const signalMap = new Map(signals.map((s) => [s.id, s]));
-    const evaluations: EvaluationResult[] = parsed.evaluations.map((e) => {
-      const sig = signalMap.get(e.ref);
-      return {
-        id: e.ref,
-        title: sig?.title ?? '',
-        url: sig?.url ?? null,
-        source: sig?.source ?? '',
-        source_category: sig?.source_category ?? '',
-        recommendation: (e.recommendation as EvaluationResult['recommendation']) ?? 'skip',
-        reasoning: e.reasoning,
-        proposed_title: e.proposed_title,
-        proposed_body: e.proposed_body,
-        signal_type: (e.signal_type as EvaluationResult['signal_type']) ?? undefined,
-      };
-    });
-
-    const observe = evaluations.filter((e) => e.recommendation === 'observe').length;
-    const skip = evaluations.filter((e) => e.recommendation === 'skip').length;
-    const del = evaluations.filter((e) => e.recommendation === 'delete').length;
-
-    log.info(ctx.reqId, 'Evaluation complete', { observe, skip, delete: del });
-
-    return log.end(
-      ctx,
-      Response.json({ evaluations, question, synthesis: parsed.synthesis ?? null }),
-      { observe, skip, delete: del }
-    );
-  } catch (error) {
-    log.err(ctx, error);
-    return Response.json({ error: 'Evaluation failed' }, { status: 500 });
+    return {
+      id: signal.id,
+      title: signal.title,
+      url: signal.url,
+      source: signal.source,
+      source_category: signal.source_category,
+      recommendation: (parsed.recommendation as EvaluationResult['recommendation']) ?? 'skip',
+      reasoning: parsed.reasoning ?? '',
+      proposed_title: parsed.proposed_title,
+      proposed_body: parsed.proposed_body,
+      signal_type: (parsed.signal_type as EvaluationResult['signal_type']) ?? undefined,
+    };
+  } catch {
+    // Fallback — don't crash the whole stream for one bad signal
+    return {
+      id: signal.id,
+      title: signal.title,
+      url: signal.url,
+      source: signal.source,
+      source_category: signal.source_category,
+      recommendation: 'skip',
+      reasoning: 'Evaluation failed for this signal.',
+    };
   }
+}
+
+export async function POST(req: Request): Promise<Response> {
+  const ctx = log.begin();
+
+  const body = (await req.json().catch(() => ({}))) as { date?: string };
+  const date = body.date ?? new Date().toISOString().split('T')[0];
+
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      function flush(chunk: StreamChunk) {
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(chunk) + '\n'));
+        } catch {
+          // client disconnected — ignore
+        }
+      }
+
+      try {
+        const rows = await sql`
+          SELECT id, title, url, notes, source, source_category
+          FROM signal_inputs
+          WHERE date = ${date}
+          ORDER BY id DESC
+        `;
+        const signals = rows as SignalRow[];
+
+        if (signals.length === 0) {
+          flush({ type: 'question', question: getTodayQuestion(), total: 0 });
+          controller.close();
+          log.end(ctx, new Response(null, { status: 200 }), { count: 0 });
+          return;
+        }
+
+        const question = getTodayQuestion();
+        flush({ type: 'question', question, total: signals.length });
+
+        if (!process.env.ANTHROPIC_API_KEY) {
+          for (const s of signals) {
+            flush({
+              type: 'result',
+              evaluation: {
+                id: s.id,
+                title: s.title,
+                url: s.url,
+                source: s.source,
+                source_category: s.source_category,
+                recommendation: 'skip',
+                reasoning: 'No Anthropic API key configured.',
+              },
+            });
+          }
+          controller.close();
+          log.end(ctx, new Response(null, { status: 200 }), { count: 0 });
+          return;
+        }
+
+        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+        // Pipeline: fetch content + evaluate in one chain per signal.
+        // Each signal starts its Claude call the moment its URL fetch resolves —
+        // no waiting for all fetches to complete before any Claude call starts.
+        const evaluations: EvaluationResult[] = [];
+        await Promise.all(
+          signals.map(async (s) => {
+            const content = await fetchContent(s);
+            const result = await evaluateOne(client, { ...s, content }, question);
+            if (result) {
+              evaluations.push(result);
+              flush({ type: 'result', evaluation: result });
+            }
+          })
+        );
+
+        const observe = evaluations.filter((e) => e.recommendation === 'observe').length;
+        const skip = evaluations.filter((e) => e.recommendation === 'skip').length;
+        const del = evaluations.filter((e) => e.recommendation === 'delete').length;
+        log.info(ctx.reqId, 'Evaluation complete', { observe, skip, delete: del });
+
+        // Synthesis — single call over all observe signals
+        if (observe > 0) {
+          const observeSignals = evaluations.filter((e) => e.recommendation === 'observe');
+          const synthPrompt = `You are a signal analyst synthesizing evaluated signals.
+
+Today's question: "${question}"
+
+Observe-rated signals:
+${JSON.stringify(
+  observeSignals.map((e) => ({
+    id: e.id,
+    title: e.title,
+    reasoning: e.reasoning,
+    proposed_title: e.proposed_title,
+  })),
+  null,
+  2
+)}
+
+Synthesize in one sentence per field. No hedging.
+- priority_ids: IDs of the 1–2 strongest signals (clearest evidence of growth AND poor service). Max 2.
+- priority: ≤20 words. Name the signal(s) using exact title text. State the growth+service-failure intersection.
+- patterns: ≤20 words. Structural theme across observe cards. If none: "No clear pattern."
+- thesis_candidate: ≤25 words. A contrarian belief this data supports — something most would push back on. A belief about how a market is misconfigured, not a product idea.
+
+Use web_search once only if you need to confirm whether a dominant solution exists.
+
+Respond with ONLY valid JSON, no markdown:
+{"priority_ids":[1,3],"priority":"...","patterns":"...","thesis_candidate":"..."}`;
+
+          try {
+            const synthMsg = await client.messages.create({
+              model: 'claude-sonnet-4-6',
+              max_tokens: 512,
+              tools: [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
+              messages: [{ role: 'user', content: synthPrompt }],
+            });
+            const lastText = [...synthMsg.content].reverse().find((b) => b.type === 'text');
+            const rawText = lastText?.type === 'text' ? lastText.text.trim() : '{}';
+            const raw = rawText
+              .replace(/^```(?:json)?\s*/i, '')
+              .replace(/\s*```$/i, '')
+              .trim();
+            const synthesis = JSON.parse(raw) as Synthesis;
+            flush({ type: 'synthesis', synthesis });
+          } catch {
+            // Synthesis failure is non-fatal — cards are already rendered
+          }
+        }
+
+        controller.close();
+        log.end(ctx, new Response(null, { status: 200 }), { observe, skip, delete: del });
+      } catch (error) {
+        log.err(ctx, error);
+        flush({ type: 'error', message: 'Evaluation failed' });
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'application/x-ndjson; charset=utf-8',
+      'Transfer-Encoding': 'chunked',
+      'Cache-Control': 'no-store',
+      'X-Accel-Buffering': 'no', // disable nginx buffering when proxied
+    },
+  });
 }

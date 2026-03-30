@@ -44,12 +44,14 @@ schema.sql              → one-time Neon DB bootstrap (already run)
 - `/` → Main dashboard — 3-column layout: signal feed, observations, contrarian truths
 - `/api/inputs` → CRUD for signal inputs (URLs, articles, snippets)
 - `/api/observations` → CRUD for observations with tags; stores `related_input_ids INT[]` linking back to signal inputs
-- `/api/truths` → CRUD for contrarian truths — thesis, conviction level (1–5), status lifecycle (forming → confident → validated → invalidated), `supporting_observations INT[]`
+- `/api/truths` → CRUD for contrarian truths — thesis, conviction level (1–5), status lifecycle (forming → confident → validated → invalidated), `supporting_observations INT[]`, `proven_market TEXT`
 - `/api/stats` → Aggregate stats for dashboard header streak display
 - `/api/digest` → Weekly digest generation — email-ready summary
 - `/api/feedback` → Feedback submissions + newsletter signup
 - `/api/agent/run` → POST — fetches HN, Product Hunt, Indie Hackers, r/SaaS, r/Entrepreneur; filters via Claude; inserts to signal_inputs tagged `agent`
 - `/api/agent/evaluate` → POST — fetches real source content (Reddit JSON, HN Algolia, article HTML), calls Claude (`claude-sonnet-4-6`) with `web_search_20260209` tool (max 3 uses), returns `EvaluationResult[]` + `Synthesis`; results cached in localStorage by date
+- `/api/agent/propose` → POST — reads last 30 observations (all dates), calls Claude once, returns `{ thesis, supporting_observations, conviction_level, reasoning }` — powers the Synthesize button in observations panel
+- `/api/agent/validate` → POST — reads a thesis string, calls Claude (no web search, fast), returns `{ proposed_proven_market }` — powers Level 1 competitor research in ValidateThesisModal; results cached in localStorage by thesis ID + date
 
 ## Brand & Voice
 
@@ -66,7 +68,7 @@ A solo developer who knows how to build but doesn't yet know what to build. Disc
 **Visual Rules:**
 
 - Light and dark mode. Defaults to system preference. Theme toggle in the dashboard header.
-- Fonts: Inter (body, headlines) + JetBrains Mono (badges, tags, code, timestamps).
+- Fonts: Inter (body, headlines) + JetBrains Mono (badges, tags, code, timestamps) + Playfair Display (daily question — serif italic in signal feed header).
 - Motion: Minimal. Subtle fade on load. Nothing moves unless it has to.
 - Avoid: no gradients, no blue of any shade, no decorative illustrations, no stock photos.
 - Burnt orange (`oklch(0.62 0.14 38)` dark / `oklch(0.52 0.14 38)` light, hue 38) is the single identity color.

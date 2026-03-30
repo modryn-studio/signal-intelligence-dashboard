@@ -50,7 +50,9 @@ function StreakDots({ streak }: { streak: { date: string; count: number }[] }) {
 }
 
 export function DashboardHeader() {
-  const { data: stats } = useSWR<Stats>('/api/stats', fetcher, { refreshInterval: 60000 });
+  const { data: stats } = useSWR<Stats>(`/api/stats?today=${localDateStr()}`, fetcher, {
+    refreshInterval: 60000,
+  });
   const [digestOpen, setDigestOpen] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);

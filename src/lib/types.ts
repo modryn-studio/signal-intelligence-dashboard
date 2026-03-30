@@ -18,6 +18,7 @@ export interface Observation {
   title: string;
   body: string;
   related_input_ids: number[];
+  related_inputs?: { id: number; title: string; url: string | null }[];
   tags: string[];
   created_at: string;
 }
@@ -29,6 +30,7 @@ export interface ContrarianTruth {
   supporting_observations: number[];
   conviction_level: 1 | 2 | 3 | 4 | 5;
   status: 'forming' | 'confident' | 'validated' | 'invalidated';
+  proven_market?: string;
   created_at: string;
   updated_at: string;
 }
