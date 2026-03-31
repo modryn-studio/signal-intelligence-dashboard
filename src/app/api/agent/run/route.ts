@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { sql } from '@/lib/db';
+import { sql, getActiveMarketId } from '@/lib/db';
 import { createRouteLogger } from '@/lib/route-logger';
 
 import { getTodayQuestion } from '@/lib/utils';
@@ -15,6 +15,7 @@ interface FetchedItem {
   source: string;
   defaultCategory: SourceCategory;
   score: number;
+  isCustomSource?: boolean;
 }
 
 interface ClaudeSelected {
@@ -209,6 +210,27 @@ export async function POST(req: Request): Promise<Response> {
     const question = getTodayQuestion();
     log.info(ctx.reqId, 'Fetching sources', { question });
 
+    // Resolve active market for scoping + custom sources
+    const marketId = await getActiveMarketId();
+    let marketContext = '';
+    let customSubreddits: string[] = [];
+
+    if (marketId) {
+      const [market] = (await sql`
+        SELECT name, description FROM markets WHERE id = ${marketId}
+      `) as { name: string; description: string | null }[];
+      const sourcesRows = (await sql`
+        SELECT value FROM market_sources WHERE market_id = ${marketId} AND source_type = 'subreddit'
+      `) as { value: string }[];
+      customSubreddits = sourcesRows.map((r) => r.value);
+      if (market) {
+        marketContext = `The builder is researching the **${market.name}** market.${
+          market.description ? ` ${market.description}` : ''
+        } Select only signals directly relevant to this market — discard anything that doesn't fit.\n\n`;
+        log.info(ctx.reqId, 'Market context', { market: market.name, customSubreddits });
+      }
+    }
+
     const [hn, redditSaas, redditEnt, productHunt, indieHackers] = await Promise.all([
       fetchHN(),
       fetchReddit('SaaS'),
@@ -217,12 +239,18 @@ export async function POST(req: Request): Promise<Response> {
       fetchIndieHackers(),
     ]);
 
+    const customRedditResults = await Promise.all(customSubreddits.map((sub) => fetchReddit(sub)));
+    const customItems: FetchedItem[] = customRedditResults
+      .flat()
+      .map((item) => ({ ...item, isCustomSource: true }));
+
     const allItems: FetchedItem[] = [
       ...hn,
       ...redditSaas,
       ...redditEnt,
       ...productHunt,
       ...indieHackers,
+      ...customItems,
     ];
     log.info(ctx.reqId, 'Fetched', {
       hn: hn.length,
@@ -230,6 +258,7 @@ export async function POST(req: Request): Promise<Response> {
       redditEnt: redditEnt.length,
       productHunt: productHunt.length,
       indieHackers: indieHackers.length,
+      custom: customItems.length,
       total: allItems.length,
     });
 
@@ -246,7 +275,7 @@ export async function POST(req: Request): Promise<Response> {
         score,
       }));
 
-      const prompt = `Today's focusing question: "${question}"
+      const prompt = `${marketContext}Today's focusing question: "${question}"
 
 Below are ${allItems.length} recent posts from Hacker News, Product Hunt, Indie Hackers, r/SaaS, and r/Entrepreneur. Select the 8 to 12 most relevant to the focusing question. For each, assign source_category (trends, complaints, indie, or data — judge by content, not by source) and write a one-line note explaining what the signal is and why it matters to someone looking for underserved markets.
 
@@ -293,9 +322,9 @@ Respond with ONLY valid JSON, no markdown fences, no explanation:
       if (!item) continue;
       if (item.url && existingUrls.has(item.url)) continue;
       if (existingTitles.has(item.title)) continue;
-      const tags = ['agent'];
+      const tags = item.isCustomSource ? ['agent', 'custom-source'] : ['agent'];
       await sql`
-        INSERT INTO signal_inputs (date, source, source_category, title, url, notes, tags)
+        INSERT INTO signal_inputs (date, source, source_category, title, url, notes, tags, market_id)
         VALUES (
           ${today},
           ${item.source},
@@ -303,7 +332,8 @@ Respond with ONLY valid JSON, no markdown fences, no explanation:
           ${item.title},
           ${item.url},
           ${sel.note || null},
-          ${tags}
+          ${tags},
+          ${marketId ?? null}
         )
       `;
       logged++;

@@ -1,16 +1,20 @@
-# Signal Intelligence -- How to Use It
+# Signal Intelligence — How to Use It
 
 ---
 
 ## The big picture
 
-There are three columns on the page.
+When you first open the app, it asks you to define a market. That's step one of everything.
 
-**Left -- Signals.** Stuff you found on the internet today. Raw material.
+A market is a space you actually care about — an industry, a problem, a community you already belong to. The app organizes every signal, observation, and thesis around that market. It's your personal research workspace.
 
-**Middle -- Observations.** Patterns you are starting to notice. Written in your own words.
+Once you're in, there are three columns.
 
-**Right -- Theses.** Bold beliefs you are forming. Things you would bet money on.
+**Left — Signals.** Stuff you found on the internet today. Raw material.
+
+**Middle — Observations.** Patterns you are starting to notice. Written in your own words.
+
+**Right — Theses.** Bold beliefs you are forming. Things you would bet money on.
 
 The goal: move things from left to right. Signal becomes observation. Observation becomes thesis.
 
@@ -20,57 +24,63 @@ At the top of the page there is a question in italics. That is your focus for to
 
 ---
 
-## Step 1 -- Read today's question
+## Step 1 — Define your market
 
-It is at the top of the page. Something like:
+When you first open the app, you land on the onboarding screen.
 
-> "What do people keep complaining about that no one has fixed?"
+Write in the text field in your own words. Describe a space you work in, know well, or keep getting frustrated by. An industry, a job role, a tool you hate, a problem that keeps coming back. One paragraph or a few sentences is enough.
 
-Read it. Keep it in your head. Every signal you log and every observation you write should answer it.
+Click **Find my market →**.
+
+The agent reads what you wrote, searches for real communities where people in that space talk, and suggests a market name, a short description, and some subreddits to watch.
+
+Review it. Edit the name if it's off. Toggle the sources you want. Click **Start observing →**.
+
+You land on your market dashboard. The agent starts fetching your first batch of signals automatically.
 
 ---
 
-## Step 2 -- Fill the left column with signals
+## Step 2 — Fill the left column with signals
 
 You have two ways to do this.
 
-### Option A -- Run the agent (fastest)
+### Option A — Run the agent (fastest)
 
 Click **Agent** in the top-right of the left column. Click **Run Agent**.
 
-A progress window opens. Wait 15-30 seconds.
+A progress window opens. Wait 15–30 seconds.
 
-What it does: it reads recent posts from Hacker News, Product Hunt, Indie Hackers, r/SaaS, and r/Entrepreneur. It keeps only the ones that match today's question. Everything else is thrown away.
+What it does: it reads recent posts from Hacker News, Product Hunt, Indie Hackers, r/SaaS, r/Entrepreneur, and any custom subreddits you added to your market. It keeps only the ones that match today's question and your market focus. Everything else is thrown away.
 
 When it finishes, click **Deep Evaluate** to move to the next step.
 
-### Option B -- Add signals yourself
+### Option B — Add signals yourself
 
 Click **+ Log Input** in the top-right of the left column.
 
 Fill in the form:
 
 - **What did you find?** One sentence.
-- **Category** -- Trends, Pain, Indie, or Raw.
-- **Source** -- where you found it (Hacker News, Reddit, etc.).
-- **URL** -- paste the link. Optional.
-- **Notes** -- one sentence on why it caught your attention. Write this now. You will forget later.
+- **Category** — Trends, Pain, Indie, or Raw.
+- **Source** — where you found it (Hacker News, Reddit, etc.).
+- **URL** — paste the link. Optional.
+- **Notes** — one sentence on why it caught your attention. Write this now. You will forget later.
 
 Click **Save**.
 
-Aim for 5-12 signals per session.
+Aim for 5–12 signals per session.
 
 ---
 
-## Step 3 -- Evaluate the signals
+## Step 3 — Evaluate the signals
 
 Click **Agent** then **Deep Evaluate** in the left column header. Or click **Deep Evaluate** at the end of the Run Agent screen.
 
 A window opens. Cards stream in one by one. Each card shows a verdict:
 
-- **Observe** -- real gap. Worth saving.
-- **Skip** -- interesting but not actionable.
-- **Delete** -- noise.
+- **Observe** — real gap. Worth saving.
+- **Skip** — interesting but not actionable.
+- **Delete** — noise.
 
 At the top of the window, there is an **Analysis** section with three lines:
 
@@ -82,7 +92,7 @@ There is a big button below the analysis:
 
 > **Accept top signals + form thesis**
 
-Click it. This saves the top signals as observations and creates a thesis in the right column -- all in one click. Done.
+Click it. This saves the top signals as observations and creates a thesis in the right column — all in one click. Done.
 
 If you want to review cards one by one instead:
 
@@ -94,7 +104,7 @@ When you are done, click **Done**.
 
 ---
 
-## Step 4 -- Turn any single signal into an observation yourself
+## Step 4 — Turn any single signal into an observation yourself
 
 You do not have to use the agent. You can do this by hand.
 
@@ -102,24 +112,24 @@ Hover over any signal card in the left column. Click **Observe**.
 
 The observation form opens pre-filled. Edit it:
 
-- **Title** -- describe the pattern, not the article. "Stripe fees are squeezing bootstrapped founders" not "Founder complains on Reddit."
-- **Body** -- one or two sentences. What is actually happening and why it matters.
+- **Title** — describe the pattern, not the article. "Stripe fees are squeezing bootstrapped founders" not "Founder complains on Reddit."
+- **Body** — one or two sentences. What is actually happening and why it matters.
 
 Click **Save Observation**. It appears in the middle column.
 
 ---
 
-## Step 5 -- Turn your observations into a thesis
+## Step 5 — Turn your observations into a thesis
 
 Once you have 3 or more observations saved, a **Synthesize** button appears in the top-right of the middle column.
 
 Click it.
 
-A window opens. It reads everything you have ever logged and looks for a pattern.
+A window opens. It reads everything you have logged and looks for a pattern.
 
 When it finishes, you will see:
 
-- A proposed thesis -- a one-sentence contrarian belief
+- A proposed thesis — a one-sentence contrarian belief
 - Which observations support it
 - How confident it is (1 = hunch, 3 = believe it)
 - A short explanation
@@ -132,51 +142,63 @@ To write a thesis yourself, close this window and click **+ Form Thesis** in the
 
 ---
 
-## Step 6 -- Validate the thesis
+## Step 6 — Validate the thesis
 
 This is the most important step. Most people skip it. Do not skip it.
 
-Validation is not a feeling. It is evidence. There are three levels of evidence. You need at least two to advance a thesis.
+Validation is evidence, not a feeling. You need one thing: proof that people already pay for something in this space.
 
-Once you have any thesis (Forming or Confident status), a **Validate** button appears in the top-right of the right column.
+Once you have any forming thesis, a **Validate →** button appears in the top-right of the right column.
 
 Click it.
 
-A window opens. The agent auto-picks your highest-conviction thesis and starts researching. Wait a few seconds.
+A window opens. The agent auto-picks the first thesis and starts researching. Use the **← / →** arrows to navigate between multiple forming theses.
 
-The window has three sections.
-
-### Level 1 -- Passive Evidence
+### Proven Market
 
 The agent searches for competing products and pre-fills this for you. Review it. Edit if needed.
 
-You are looking for: 3-5 products that exist and charge money. If someone built it and charges for it, that is proof the market exists. You do not need to validate what the market already validated.
+You are looking for: 3–5 products that exist and charge money. If someone built it and charges for it, the market is real.
 
 Examples of what to write:
 
-> Exploding Topics Pro ($49/mo), Trends.vc ($150/mo), SparkToro ($50/mo)
+> Vanta ($thousands/yr for compliance automation), Nightfall AI ($starts ~$1000/mo)
 
-If the agent finds nothing, write what you know or leave it blank for now.
+If the agent finds nothing, write what you know or leave it blank for now. Click **↺ Re-research** in the footer to try again.
 
-### Level 2 -- Active Evidence
+### The button
 
-A checkbox. Check it if you have found 20 or more people actively complaining about this problem online.
+When you are satisfied with the proven market field, click **Validate →**. This moves the thesis from **Forming** to **Validated**.
 
-Look on Reddit, Twitter, Indie Hackers, or anywhere your target person lives. You are looking for complaints, workarounds, people duct-taping spreadsheets together, people hiring VAs to do something manually. Workarounds are the strongest signal. They mean the pain is real and unsolved cleanly.
-
-An optional notes field appears when you check this. Paste a link or write where you found the complaints.
-
-### The threshold
-
-Both sections filled -- the button changes to **Save & Validate**. Click it to save and move the thesis forward (Forming to Confident, or Confident to Validated).
-
-One section filled -- the button says **Save**. It saves what you have without advancing the status. Come back when you have more evidence.
-
-A counter above the footer shows how many checks you have completed.
+Results are cached per thesis. You can close and reopen the window without losing your research.
 
 ---
 
-## Step 7 -- Link observations to theses manually
+## Step 7 — Run the lifestyle filter
+
+Validating the market is not enough. The question is whether this is a business you can run alone, without burning out.
+
+Once you have validated theses, a **Lifestyle →** button appears in the top-right of the right column (on the Validated tab).
+
+Click it.
+
+The agent reads each validated thesis and scores it against five filters:
+
+1. **Solo maintainable** — Can one person build and run this without a team?
+2. **Recurring revenue day one** — Does the model generate recurring revenue from the start? _(This is a knockout. Fail it and the thesis does not pass.)_
+3. **VC-ignored TAM** — Is the market too small for venture capital to care? Small enough that you can win.
+4. **Reachable first 20** — Can you reach your first 20 customers directly without paid ads or a big audience?
+5. **Boring enough for 5 years** — Can you maintain this without burning out?
+
+The window shows ✓ or ✗ for each filter with a short explanation. Use **← / →** to navigate between theses.
+
+If the thesis passes (4 of 5, and Q2 must pass), click **Accept →**. The thesis becomes a **Ready to Build** card.
+
+If it does not pass, the result tells you which filters failed. You can re-run with **↺ Re-analyze** or use the manual checklist (hover the thesis card on the Validated tab).
+
+---
+
+## Step 8 — Link observations to theses manually
 
 You do not have to use the automation. You can connect things by hand at any time.
 
@@ -184,95 +206,17 @@ You do not have to use the automation. You can connect things by hand at any tim
 
 **Write a thesis yourself:** click **+ Form Thesis** in the right column header.
 
-**Contradict an existing thesis:** hover over a thesis card. Click **Invalidate** to mark it wrong. It moves to the Invalidated archive so you can learn from it.
-
-**Change conviction:** click the dots on the left side of any thesis card to change the conviction level (1-5).
-
 ---
 
-## Step 8 -- Log your numbers before you close
+## Managing your markets
 
-Before you close the tab, note down:
+Click the **orange market name** in the dashboard header to open the market settings.
 
-1. How many signals did you log today?
-2. How many became observations?
-3. How many observations got attached to a thesis?
-4. Did any thesis advance status today?
+From there you can:
 
-After 5 days, these numbers tell you exactly where things are getting stuck.
+- Edit the market name and description
+- Add or remove custom subreddits (the agent will fetch these automatically when you Run Agent)
+- Navigate to **All markets** if you have more than one
+- Create a **+ New market** workspace
 
----
-
-## What the cards look like
-
-### Signal card (left column)
-
-Title, source badge, category color, tags, timestamp, your notes.
-
-Hover to see:
-
-- **Observe** -- save as an observation
-- **X** -- delete this card
-
-### Observation card (middle column)
-
-Title, body text, date, tags. Date group headers are collapsible.
-
-Hover to see:
-
-- **Source** -- links back to the original signal (only if the signal had a URL)
-- **Add to thesis** -- attach to a thesis
-- **X** -- delete
-
-### Thesis card (right column)
-
-Thesis text in quotes, status badge (Forming / Confident / Validated / Invalidated), conviction label (Hunch / Lean / Believe / Confident / Certain), observation count, five dot indicators.
-
-If a proven market has been saved, it shows in small grey text below the thesis.
-
-Hover to see:
-
-- **Advance** -- moves the status forward. Greyed out on Confident theses until the proven market is filled in.
-- **Invalidate** -- marks it wrong
-- **X** -- deletes it permanently
-
----
-
-## What the header numbers mean
-
-- **Today** -- signals logged today
-- **Observations** -- total observations ever
-- **Theses** -- total theses ever
-- **Streak** -- the row of small squares. Dark = you logged something that day.
-
----
-
-## Other buttons
-
-**Digest** -- a text summary of everything in the system. Useful for a weekly review.
-
-**Sun/moon icon** -- light and dark mode toggle.
-
----
-
-## What is and is not working
-
-| Feature                                                | Status        |
-| ------------------------------------------------------ | ------------- |
-| Logging signal inputs                                  | Working       |
-| Run Agent (HN + Product Hunt + Indie Hackers + Reddit) | Working       |
-| Deep Evaluate (reads sources, drafts observations)     | Working       |
-| Accept top signals + form thesis (one-click)           | Working       |
-| Observe button on signal cards                         | Working       |
-| Add to thesis on observation cards                     | Working       |
-| Synthesize button (observations to thesis)             | Working       |
-| Validate button (2-level evidence framework)           | Working       |
-| Advance gated behind both evidence checks              | Working       |
-| Stats and streak                                       | Working       |
-| Digest preview                                         | Working       |
-| Digest email delivery                                  | Not wired yet |
-| URL metadata auto-fill                                 | Not built yet |
-
----
-
-_Last updated: March 30, 2026_
+Each market is a separate workspace. Signals, observations, and theses in one market do not appear in another.

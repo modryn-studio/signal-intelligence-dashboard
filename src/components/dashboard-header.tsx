@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { Sun, Moon } from 'lucide-react';
 import { DigestModal } from '@/components/digest-modal';
+import { MarketConfigModal } from '@/components/market-config-modal';
+import type { Market, MarketSource } from '@/lib/types';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -53,7 +55,12 @@ export function DashboardHeader() {
   const { data: stats } = useSWR<Stats>(`/api/stats?today=${localDateStr()}`, fetcher, {
     refreshInterval: 60000,
   });
+  const { data: marketData, mutate: mutateMarket } = useSWR<{
+    market: Market;
+    sources: MarketSource[];
+  } | null>('/api/markets', fetcher, { refreshInterval: 0 });
   const [digestOpen, setDigestOpen] = useState(false);
+  const [marketConfigOpen, setMarketConfigOpen] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -82,6 +89,15 @@ export function DashboardHeader() {
               <p className="text-muted-foreground/70 dark:text-muted-foreground/85 mt-1 font-mono text-[10px] tracking-wider">
                 — {dateStr}
               </p>
+              {marketData?.market && (
+                <button
+                  type="button"
+                  onClick={() => setMarketConfigOpen(true)}
+                  className="text-primary mt-1 font-mono text-[10px] tracking-widest uppercase transition-opacity hover:opacity-70"
+                >
+                  {marketData.market.name}
+                </button>
+              )}
             </div>
           </div>
 
@@ -147,6 +163,17 @@ export function DashboardHeader() {
       </header>
 
       <DigestModal open={digestOpen} onClose={() => setDigestOpen(false)} />
+      {marketData?.market && (
+        <MarketConfigModal
+          open={marketConfigOpen}
+          onClose={() => setMarketConfigOpen(false)}
+          market={marketData.market}
+          sources={marketData.sources ?? []}
+          onUpdated={() => {
+            void mutateMarket();
+          }}
+        />
+      )}
     </>
   );
 }

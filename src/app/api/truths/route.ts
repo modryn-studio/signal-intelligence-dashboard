@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { sql, getActiveMarketId } from '@/lib/db';
 
-// Ensure proven_market column exists — idempotent, safe on every cold start
+// Ensure columns exist — idempotent, safe on every cold start
 void sql`ALTER TABLE contrarian_truths ADD COLUMN IF NOT EXISTS proven_market TEXT`.catch(() => {});
+void sql`ALTER TABLE contrarian_truths ADD COLUMN IF NOT EXISTS lifestyle_pass BOOLEAN`.catch(
+  () => {}
+);
+void sql`ALTER TABLE contrarian_truths ADD COLUMN IF NOT EXISTS lifestyle_results JSONB`.catch(
+  () => {}
+);
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const marketId = await getActiveMarketId();
   try {
     const truths = await sql`
       SELECT * FROM contrarian_truths
+      WHERE (${marketId}::int IS NULL OR market_id = ${marketId})
       ORDER BY updated_at DESC
     `;
     return NextResponse.json(truths);
@@ -30,10 +38,11 @@ export async function POST(request: NextRequest) {
     const supportingObs = supporting_observations || [];
     const convictionLevel = conviction_level || 1;
     const truthStatus = status || 'forming';
+    const marketId = await getActiveMarketId();
 
     const [truth] = await sql`
-      INSERT INTO contrarian_truths (date, thesis, supporting_observations, conviction_level, status)
-      VALUES (${truthDate}, ${thesis}, ${supportingObs}, ${convictionLevel}, ${truthStatus})
+      INSERT INTO contrarian_truths (date, thesis, supporting_observations, conviction_level, status, market_id)
+      VALUES (${truthDate}, ${thesis}, ${supportingObs}, ${convictionLevel}, ${truthStatus}, ${marketId})
       RETURNING *
     `;
     return NextResponse.json(truth, { status: 201 });
@@ -46,7 +55,16 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, conviction_level, status, thesis, proven_market, appendObservationId } = body;
+    const {
+      id,
+      conviction_level,
+      status,
+      thesis,
+      proven_market,
+      lifestyle_pass,
+      lifestyle_results,
+      appendObservationId,
+    } = body;
 
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
@@ -62,6 +80,8 @@ export async function PATCH(request: NextRequest) {
         RETURNING *
       `;
     } else {
+      const lifestyleResultsJson =
+        lifestyle_results != null ? JSON.stringify(lifestyle_results) : null;
       [truth] = await sql`
         UPDATE contrarian_truths
         SET
@@ -69,6 +89,8 @@ export async function PATCH(request: NextRequest) {
           conviction_level = COALESCE(${conviction_level ?? null}, conviction_level),
           status = COALESCE(${status ?? null}, status),
           proven_market = COALESCE(${proven_market ?? null}, proven_market),
+          lifestyle_pass = COALESCE(${lifestyle_pass ?? null}, lifestyle_pass),
+          lifestyle_results = COALESCE(${lifestyleResultsJson}::jsonb, lifestyle_results),
           updated_at = NOW()
         WHERE id = ${id}
         RETURNING *

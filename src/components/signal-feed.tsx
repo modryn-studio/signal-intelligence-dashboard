@@ -1,7 +1,8 @@
 'use client';
 
 import useSWR from 'swr';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import type { SignalInput } from '@/lib/types';
 import { SOURCE_CATEGORIES } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -198,6 +199,9 @@ interface SignalFeedProps {
 }
 
 export function SignalFeed({ selectedDate, isToday, shiftDay }: SignalFeedProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
   const todayQuestion = isToday ? getTodayQuestion() : getQuestionForDate(selectedDate);
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -209,6 +213,15 @@ export function SignalFeed({ selectedDate, isToday, shiftDay }: SignalFeedProps)
   const [observePrefill, setObservePrefill] = useState<
     { body: string; relatedInputIds: number[]; title?: string; tags?: string } | undefined
   >(undefined);
+
+  // Auto-open agent run modal when landing from onboarding with ?fresh=1
+  useEffect(() => {
+    if (searchParams.get('fresh') === '1') {
+      router.replace(pathname);
+      setAgentModalOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openObserveModal = (input: SignalInput) => {
     setObservePrefill({

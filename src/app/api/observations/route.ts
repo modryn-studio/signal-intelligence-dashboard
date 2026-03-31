@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { sql, getActiveMarketId } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -7,48 +7,24 @@ export async function GET(request: NextRequest) {
   const date = searchParams.get('date');
   const limit = parseInt(searchParams.get('limit') || '30');
 
-  // Subquery that attaches the first related input's url + title to each observation.
-  // Using COALESCE so the field is always [] when there are no linked inputs.
+  const marketId = await getActiveMarketId();
+
   try {
-    const observations = date
-      ? await sql`
-          SELECT o.*,
-            COALESCE(
-              (SELECT json_agg(json_build_object('id', si.id, 'title', si.title, 'url', si.url))
-               FROM signal_inputs si
-               WHERE si.id = ANY(o.related_input_ids)),
-              '[]'::json
-            ) AS related_inputs
-          FROM observations o
-          WHERE o.date = ${date}
-          ORDER BY o.created_at DESC
-        `
-      : tag
-        ? await sql`
-            SELECT o.*,
-              COALESCE(
-                (SELECT json_agg(json_build_object('id', si.id, 'title', si.title, 'url', si.url))
-                 FROM signal_inputs si
-                 WHERE si.id = ANY(o.related_input_ids)),
-                '[]'::json
-              ) AS related_inputs
-            FROM observations o
-            WHERE ${tag} = ANY(o.tags)
-            ORDER BY o.created_at DESC
-            LIMIT ${limit}
-          `
-        : await sql`
-            SELECT o.*,
-              COALESCE(
-                (SELECT json_agg(json_build_object('id', si.id, 'title', si.title, 'url', si.url))
-                 FROM signal_inputs si
-                 WHERE si.id = ANY(o.related_input_ids)),
-                '[]'::json
-              ) AS related_inputs
-            FROM observations o
-            ORDER BY o.created_at DESC
-            LIMIT ${limit}
-          `;
+    const observations = await sql`
+      SELECT o.*,
+        COALESCE(
+          (SELECT json_agg(json_build_object('id', si.id, 'title', si.title, 'url', si.url))
+           FROM signal_inputs si
+           WHERE si.id = ANY(o.related_input_ids)),
+          '[]'::json
+        ) AS related_inputs
+      FROM observations o
+      WHERE (${date}::text IS NULL OR o.date = ${date}::date)
+        AND (${tag}::text IS NULL OR ${tag} = ANY(o.tags))
+        AND (${marketId}::int IS NULL OR o.market_id = ${marketId})
+      ORDER BY o.created_at DESC
+      LIMIT ${limit}
+    `;
     return NextResponse.json(observations);
   } catch (error) {
     console.error('[observations] GET error:', error);
@@ -68,10 +44,11 @@ export async function POST(request: NextRequest) {
     const obsDate = date || new Date().toISOString().split('T')[0];
     const relatedIds = related_input_ids || [];
     const obsTags = tags || [];
+    const marketId = await getActiveMarketId();
 
     const [observation] = await sql`
-      INSERT INTO observations (date, title, body, related_input_ids, tags)
-      VALUES (${obsDate}, ${title}, ${obsBody}, ${relatedIds}, ${obsTags})
+      INSERT INTO observations (date, title, body, related_input_ids, tags, market_id)
+      VALUES (${obsDate}, ${title}, ${obsBody}, ${relatedIds}, ${obsTags}, ${marketId})
       RETURNING *
     `;
     return NextResponse.json(observation, { status: 201 });

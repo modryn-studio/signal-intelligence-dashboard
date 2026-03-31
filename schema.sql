@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS contrarian_truths (
   thesis                  TEXT        NOT NULL,
   supporting_observations INT[]       NOT NULL DEFAULT '{}',
   conviction_level        INT         NOT NULL DEFAULT 1 CHECK (conviction_level BETWEEN 1 AND 5),
-  status                  TEXT        NOT NULL DEFAULT 'forming',  -- 'forming' | 'confident' | 'validated' | 'invalidated'
+  status                  TEXT        NOT NULL DEFAULT 'forming',  -- 'forming' | 'validated' | 'invalidated'
   created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

@@ -20,7 +20,11 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = (url: string) =>
+  fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  });
 
 function useActiveDays() {
   const { data } = useSWR<{ recent_streak: { date: string; count: number }[] }>(

@@ -29,10 +29,30 @@ export interface ContrarianTruth {
   thesis: string;
   supporting_observations: number[];
   conviction_level: 1 | 2 | 3 | 4 | 5;
-  status: 'forming' | 'confident' | 'validated' | 'invalidated';
+  status: 'forming' | 'validated' | 'invalidated';
   proven_market?: string;
+  lifestyle_pass?: boolean | null;
+  lifestyle_results?: Array<{ label: string; pass: boolean; reasoning: string }> | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface Market {
+  id: number;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  signal_count?: number;
+}
+
+export interface MarketSource {
+  id: number;
+  market_id: number;
+  source_type: 'subreddit' | 'community';
+  value: string;
+  created_at: string;
 }
 
 export interface EmailDigest {

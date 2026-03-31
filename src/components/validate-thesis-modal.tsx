@@ -11,11 +11,11 @@ import { localDateStr } from '@/lib/utils';
 // ─── Day-scoped localStorage cache (per thesis) ───────────────────────────────
 
 const VALIDATE_STEPS = [
-  { label: 'Reading thesis', detail: 'Preparing search query' },
-  { label: 'Searching the web', detail: 'Finding competing products' },
-  { label: 'Verifying pricing', detail: 'Cross-checking current numbers' },
+  { label: 'Reading thesis', detail: 'Preparing query' },
+  { label: 'Checking knowledge base', detail: 'Scanning known products' },
+  { label: 'Finding competitors', detail: 'Matching pricing signals' },
 ];
-const VALIDATE_STEP_AT = [0, 5000, 18000];
+const VALIDATE_STEP_AT = [0, 1000, 2500];
 
 interface ValidateCacheEntry {
   date: string;
@@ -53,7 +53,7 @@ function writeValidateCache(thesisId: number, provenMarket: string) {
 interface ActiveTruth {
   id: number;
   thesis: string;
-  status: 'forming' | 'confident';
+  status: 'forming';
   proven_market?: string;
   conviction_level?: number;
 }
@@ -65,18 +65,11 @@ interface Props {
   onSaved: () => void;
 }
 
-const NEXT_STATUS = { forming: 'confident', confident: 'validated' } as const;
+const VALIDATED_STATUS = 'validated' as const;
 
 export function ValidateThesisModal({ open, onClose, truths, onSaved }: Props) {
-  // Auto-rank: highest conviction forming first, then confident
   const sortedTruths = useMemo(() => {
-    const forming = truths
-      .filter((t) => t.status === 'forming')
-      .sort((a, b) => (b.conviction_level ?? 0) - (a.conviction_level ?? 0));
-    const confident = truths
-      .filter((t) => t.status === 'confident')
-      .sort((a, b) => (b.conviction_level ?? 0) - (a.conviction_level ?? 0));
-    return [...forming, ...confident];
+    return [...truths].sort((a, b) => (b.conviction_level ?? 0) - (a.conviction_level ?? 0));
   }, [truths]);
 
   const [thesisIdx, setThesisIdx] = useState(0);
@@ -86,8 +79,6 @@ export function ValidateThesisModal({ open, onClose, truths, onSaved }: Props) {
   const researchTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const researchAbortRef = useRef<AbortController | null>(null);
   const [editingMarket, setEditingMarket] = useState(false);
-  const [level2Checked, setLevel2Checked] = useState(false);
-  const [level2Notes, setLevel2Notes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -96,6 +87,7 @@ export function ValidateThesisModal({ open, onClose, truths, onSaved }: Props) {
       const cached = readValidateCache(truth.id);
       if (cached) {
         setProvenMarket(cached);
+        setResearchLoading(false);
         return;
       }
     }
@@ -136,11 +128,9 @@ export function ValidateThesisModal({ open, onClose, truths, onSaved }: Props) {
   useEffect(() => {
     if (!open) return;
     setThesisIdx(0);
-    setLevel2Checked(false);
-    setLevel2Notes('');
     setError('');
-    const first = sortedTruths[0];
-    if (first) setProvenMarket(first.proven_market ?? '');
+    setProvenMarket('');
+    setResearchLoading(true);
     setEditingMarket(false);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -151,16 +141,12 @@ export function ValidateThesisModal({ open, onClose, truths, onSaved }: Props) {
     if (!t) return;
     const existing = t.proven_market ?? '';
     setProvenMarket(existing);
-    setLevel2Checked(false);
-    setLevel2Notes('');
     setEditingMarket(false);
     if (!existing) runResearch(t);
   }, [open, thesisIdx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedTruth = sortedTruths[thesisIdx] ?? null;
-  const evidenceScore = (provenMarket.trim().length > 0 ? 1 : 0) + (level2Checked ? 1 : 0);
-  const evidencePass = evidenceScore >= 2;
-  const canSave = !!selectedTruth && evidenceScore >= 1;
+  const canSave = !!selectedTruth && provenMarket.trim().length > 0;
 
   const handleSave = async () => {
     if (!selectedTruth || !canSave) return;
@@ -173,7 +159,7 @@ export function ValidateThesisModal({ open, onClose, truths, onSaved }: Props) {
         body: JSON.stringify({
           id: selectedTruth.id,
           proven_market: provenMarket.trim(),
-          ...(evidencePass ? { status: NEXT_STATUS[selectedTruth.status] } : {}),
+          status: VALIDATED_STATUS,
         }),
       });
       if (!res.ok) throw new Error('Failed');
@@ -215,36 +201,44 @@ export function ValidateThesisModal({ open, onClose, truths, onSaved }: Props) {
           {/* Auto-selected thesis — no picker */}
           {selectedTruth && (
             <div className="border-b p-5">
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-foreground flex-1 text-xs leading-snug italic">
-                  &ldquo;{selectedTruth.thesis}&rdquo;
-                </p>
-                <span className="text-primary bg-primary/10 shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]">
-                  {selectedTruth.status}
-                </span>
-              </div>
+              <p className="text-foreground text-xs leading-snug italic">
+                &ldquo;{selectedTruth.thesis}&rdquo;
+              </p>
               {sortedTruths.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setThesisIdx((i) => (i + 1) % sortedTruths.length)}
-                  disabled={researchLoading}
-                  className="text-muted-foreground hover:text-foreground mt-2 font-mono text-[10px] underline-offset-2 transition-colors hover:underline disabled:pointer-events-none disabled:opacity-30"
-                >
-                  {researchLoading
-                    ? 'Researching…'
-                    : `Not this one (${thesisIdx + 1} of ${sortedTruths.length})`}
-                </button>
+                <div className="mt-2 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setThesisIdx((i) => (i - 1 + sortedTruths.length) % sortedTruths.length)
+                    }
+                    disabled={researchLoading}
+                    className="text-muted-foreground hover:text-foreground font-mono text-[10px] transition-colors disabled:pointer-events-none disabled:opacity-30"
+                  >
+                    ←
+                  </button>
+                  <span className="text-muted-foreground/50 font-mono text-[10px]">
+                    {researchLoading ? 'Researching…' : `${thesisIdx + 1} / ${sortedTruths.length}`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setThesisIdx((i) => (i + 1) % sortedTruths.length)}
+                    disabled={researchLoading}
+                    className="text-muted-foreground hover:text-foreground font-mono text-[10px] transition-colors disabled:pointer-events-none disabled:opacity-30"
+                  >
+                    →
+                  </button>
+                </div>
               )}
             </div>
           )}
 
-          {/* Level 1 — Passive Evidence: Claude researches competing products */}
-          <div className="border-b p-5">
+          {/* Proven Market */}
+          <div className="p-5">
             <p className="text-muted-foreground mb-1 font-mono text-[10px] tracking-widest uppercase">
-              Level 1 &mdash; Passive Evidence
+              Proven Market
             </p>
             <p className="text-muted-foreground/60 mb-3 text-xs">
-              3&ndash;5 competing products exist and charge money.
+              Do 3&ndash;5 competing products exist and charge money?
             </p>
             {researchLoading ? (
               <div className="flex flex-col gap-4 py-4">
@@ -316,73 +310,19 @@ export function ValidateThesisModal({ open, onClose, truths, onSaved }: Props) {
               />
             )}
           </div>
-
-          {/* Level 2 — Active Evidence: online complaints */}
-          <div className="border-b p-5">
-            <p className="text-muted-foreground mb-1 font-mono text-[10px] tracking-widest uppercase">
-              Level 2 &mdash; Active Evidence
-            </p>
-            <p className="text-muted-foreground/60 mb-3 text-xs">
-              20+ people actively complaining about this problem online.
-            </p>
-            <button
-              type="button"
-              onClick={() => setLevel2Checked((p) => !p)}
-              className="flex cursor-pointer items-start gap-3 text-left"
-            >
-              <span
-                className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-                  level2Checked ? 'bg-primary border-primary' : 'border-border'
-                }`}
-              >
-                {level2Checked && (
-                  <span className="text-primary-foreground font-mono text-[9px] leading-none">
-                    &#10003;
-                  </span>
-                )}
-              </span>
-              <span className="text-foreground/80 text-xs leading-snug">
-                Found threads on Reddit, Twitter, or Indie Hackers where people complain about this.
-              </span>
-            </button>
-            {level2Checked && (
-              <textarea
-                value={level2Notes}
-                onChange={(e) => setLevel2Notes(e.target.value)}
-                placeholder="Link or note — where did you find them? (optional)"
-                rows={1}
-                className="border-border bg-background text-foreground placeholder:text-muted-foreground/50 focus:ring-primary mt-2.5 w-full resize-none rounded border px-3 py-2 font-mono text-xs leading-relaxed focus:ring-1 focus:outline-none"
-              />
-            )}
-          </div>
         </div>
 
         {/* Footer */}
-        {evidenceScore > 0 && (
-          <p
-            className={`border-t px-5 py-2.5 font-mono text-[10px] tracking-wider ${
-              evidencePass ? 'text-primary' : 'text-muted-foreground'
-            }`}
-          >
-            {evidenceScore} of 2 evidence checks{evidencePass ? ' — threshold met' : ''}
-          </p>
-        )}
         {error && <p className="text-destructive border-t px-5 py-3 font-mono text-xs">{error}</p>}
         <div className="border-border flex shrink-0 items-center justify-between border-t px-5 py-3">
           <Button
             type="button"
             onClick={handleSave}
-            disabled={!canSave || saving}
+            disabled={!canSave || saving || researchLoading}
             size="sm"
             className="font-mono text-xs tracking-wider"
           >
-            {saving ? (
-              <Spinner className="h-3.5 w-3.5" />
-            ) : evidencePass ? (
-              'Save & Validate'
-            ) : (
-              'Save'
-            )}
+            {saving ? <Spinner className="h-3.5 w-3.5" /> : 'Validate →'}
           </Button>
           {!researchLoading && selectedTruth && (
             <button
