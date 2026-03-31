@@ -53,15 +53,16 @@ Current: email-only — no payment gate.
 
 - schema.sql — one-time DB bootstrap (already run in Neon)
 - lib/db.ts — Neon singleton export + `getActiveMarketId()` helper
+- lib/agent-guard.ts — shared safety guards: `AGENT_TIMEOUT_MS` (60s), `WEB_SEARCH_TIMEOUT_MS` (45s), `withTimeout()` helper. All `client.messages.create()` calls wrapped.
 - lib/types.ts — shared TypeScript types (including Market, MarketSource, ContrarianTruth, etc.)
 - app/api/ — API routes listed below
 
 ## Route Map
 
-- `/` → Market gate — checks `skipMarketOnboard` localStorage flag first (shows unscoped dashboard if set); fetches `/api/markets?all=1`; redirects: 0 markets → `/onboard`, 1 market → `/market/[id]`, 2+ → inline `<MarketPicker>` sorted by signal count descending with "+ New market" button.
+- `/` → Market gate — fetches `/api/markets?all=1`; redirects: 0 markets → `/onboard`, 1 market → `/market/[id]`, 2+ → inline `<MarketPicker>` sorted by signal count descending with "+ New market" button.
 - `/onboard` → Excavation onboarding — 2-screen flow:
-  - **Screen 1 (Interests)**: Grid of 12 interest tags (max 3 selectable) + freetext input. "Find my markets →" calls `/api/agent/excavate`. "Already have a market? Skip →" sets `skipMarketOnboard` localStorage flag and navigates to `/`.
-  - **Screen 2 (Picking)**: Shows 4 market cards from Claude's response. Demand badge (proven/growing/crowded). Inline "None of these feel right" refinement with 7 steer tags + "Regenerate →". Selecting a card POSTs to `/api/markets`, fires `/api/agent/run` silently, navigates to `/market/[id]`.
+  - **Screen 1 (Interests)**: Grid of 12 interest tags (max 3 selectable) + freetext input. "Find my markets →" calls `/api/agent/excavate`. "Already have a market? Skip →" navigates to `/` (no localStorage flag — MarketGate handles all routing).
+  - **Screen 2 (Picking)**: Shows 4 market cards — each represents a market segment (people + problem + existing spend), not a product idea. Card headline is the person/group (e.g. "Independent Restaurant Owners"), body describes their world (what they pay for, what frustrates them). Demand badge (proven/growing/crowded). Price range reflects what the market already pays. Inline "None of these feel right" refinement with 7 steer tags + "Regenerate →". Selecting a card POSTs to `/api/markets` (name = niche, description = market description), fires `/api/agent/run` silently, navigates to `/market/[id]`.
   - Loading state: Full-screen `ExcavateLoading` component with 80s CSS progress bar and rotating copy during the ~60s API call.
 - `/market/[id]` → Market dashboard — on mount PATCHes `/api/markets` to activate the market (single atomic SQL: `is_active = (id = $id)`), shows spinner while PATCH in flight, then renders full dashboard with `<DashboardHeader marketId={id}>` + `<DashboardLayout>`.
 
@@ -94,12 +95,16 @@ Current: email-only — no payment gate.
   - `recent_streak`: `[{ date, count }]` last 14 days
 - `/api/digest` → POST `{ email }` — generates HTML email (inputs by category, observations, active truths filtered by `status != 'invalidated'`; all market-scoped via `getActiveMarketId()`); inserts to `email_digests` table; returns `{ success, preview: htmlString, stats }`. Delivery requires Resend/SMTP config.
 - `/api/feedback` → POST `{ type: 'newsletter'|'feedback'|'bug', email?, message?, page? }` — logs to console; optional Resend/SMTP delivery
-- `/api/agent/run` → POST `{ today: YYYY-MM-DD }` — market-aware: injects active market name + description into Claude prompt as focus filter; fetches HN (Algolia), Product Hunt, Indie Hackers, r/SaaS, r/Entrepreneur + custom subreddits from `market_sources`; Claude (claude-sonnet-4-6, no tools) selects ~10 most relevant, assigns `source_category`; deduplicates by URL+title for today; stamps `market_id`; custom-source items tagged `['agent', 'custom-source']`; returns `{ logged, fetched, question }`
-- `/api/agent/evaluate` → POST `{ date? }` — streaming NDJSON; fetches signal_inputs for date; for each: fetches real content (Reddit JSON, HN Algolia, article HTML); Claude (claude-sonnet-4-6) with `web_search_20260209` tool (max 3 uses) returns `observe|skip|delete` + proposed observation title+body; streams each as JSON line; final chunk is synthesis (priority IDs, priority statement, patterns, thesis candidate)
-- `/api/agent/propose` → POST (no body) — reads last 30 observations (all dates); Claude (no tools) finds structural pattern → proposes one thesis; returns `{ thesis, conviction_level, supporting_observations: [{id, title}], reasoning }`; client caches in localStorage by date under `propose-cache`
-- `/api/agent/validate` → POST `{ thesis }` — Claude (no tools, fast) lists 2–3 real products serving this thesis; returns `{ proposed_proven_market }`; client caches in localStorage by thesis ID + date under `validate-cache`
-- `/api/agent/lifestyle` → POST `{ thesis, proven_market }` — Claude (no tools) assesses 5 filters (solo maintainable, recurring revenue day one, VC-ignored TAM, reachable first 20, boring enough for 5 years); Q2 (recurring revenue) is a knockout filter; returns `{ questions: [{label, pass, reasoning}], overall_pass }`; client caches in localStorage by thesis ID + date under `lifestyle-cache`
-- `/api/agent/excavate` → POST `{ tags: string[], description?: string, steer?: string[] }` — Claude (claude-sonnet-4-6) with `web_search_20260209` (max 3 uses) generates 4 distinct market options; each has `{ overall_market, niche, micro_niche, market_name, price_range, demand: 'proven'|'growing'|'crowded', description, reasoning, recommended_sources: [{source_type, value}] }`; returns `{ markets: MarketOption[] }`
+- `/api/agent/run` → POST `{ today: YYYY-MM-DD }` — market-aware: injects active market name + description into Claude prompt as focus filter; fetches HN (Algolia), Product Hunt, Indie Hackers, r/SaaS, r/Entrepreneur + custom subreddits from `market_sources`; Claude (claude-sonnet-4-6, no tools, 60s timeout) selects ~10 most relevant, assigns `source_category`; deduplicates by URL+title for today; stamps `market_id`; custom-source items tagged `['agent', 'custom-source']`; returns `{ logged, fetched, question }`
+- `/api/agent/evaluate` → POST `{ date? }` — streaming NDJSON; fetches signal_inputs for date; evaluates in batches of 5 (concurrency cap); for each: fetches real content (Reddit JSON, HN Algolia, article HTML); Claude (claude-sonnet-4-6) with `web_search_20260209` tool (max 1 use per signal, 45s timeout) returns `observe|skip|delete` + proposed observation title+body; streams each as JSON line; final chunk is synthesis (priority IDs, priority statement, patterns, thesis candidate, 45s timeout)
+- `/api/agent/propose` → POST (no body) — reads last 30 observations (all dates); Claude (no tools, 60s timeout, req.signal threaded) finds structural pattern → proposes one thesis; returns `{ thesis, conviction_level, supporting_observations: [{id, title}], reasoning }`; client caches in localStorage by date under `propose-cache`
+- `/api/agent/validate` → POST `{ thesis }` — Claude (no tools, 60s timeout, req.signal threaded) lists 2–3 real products serving this thesis; returns `{ proposed_proven_market }`; client caches in localStorage by thesis ID + date under `validate-cache`
+- `/api/agent/lifestyle` → POST `{ thesis, proven_market }` — Claude (no tools, 60s timeout, req.signal threaded) assesses 5 filters (solo maintainable, recurring revenue day one, VC-ignored TAM, reachable first 20, boring enough for 5 years); Q2 (recurring revenue) is a knockout filter; returns `{ questions: [{label, pass, reasoning}], overall_pass }`; client caches in localStorage by thesis ID + date under `lifestyle-cache`
+- `/api/agent/excavate` → POST `{ tags: string[], description?: string, steer?: string[] }` — Streaming NDJSON. Two-phase:
+  - **Stub phase**: Claude (claude-sonnet-4-6, no tools) generates 4 market segments as people-first cards. Each card names the person (market_name = group, e.g. "Independent Restaurant Owners"), their world (description = what they pay for, what frustrates them), demand level, and price range. Explicitly bans product names or tool ideas — the micro niche emerges from the signal feed, not from onboarding. Streamed as `{type:'market', data: MarketOption}` chunks.
+  - **Enrich phase**: 4 parallel Claude calls with `web_search_20260209` (max 1 use each, 45s timeout, in-flight dedup). Verifies pricing, finds subreddits, names specific competing products. Streamed as `{type:'update', data}` chunks.
+  - Steer path: cheap re-generation with modifiers, no web search.
+  - Each MarketOption: `{ overall_market, niche, micro_niche, market_name, price_range, demand: 'proven'|'growing'|'crowded', description, reasoning, recommended_sources: [{source_type, value}] }`
 
 ## Current State (as of March 31, 2026)
 
@@ -107,10 +112,10 @@ Full pipeline is wired: Market → Signal → Observation → Thesis → Validat
 
 ### Onboarding / Market Gate
 
-- `/` checks `skipMarketOnboard` localStorage first. If set, renders unscoped dashboard (no market filter). Otherwise fetches market list: 0 → `/onboard`, 1 → `/market/[id]`, 2+ → `MarketPicker` inline.
+- `/` fetches market list: 0 → `/onboard`, 1 → `/market/[id]`, 2+ → `MarketPicker` inline. No localStorage flags — routing is purely based on market count.
 - `MarketPicker` at `/`: markets sorted by `signal_count DESC`, each card shows name + description + signal count. "+ New market" button navigates to `/onboard`.
-- Onboarding is 2-screen: interest tags/freetext → market card selection. `ExcavateLoading` full-screen component shows during the ~60s Claude crawl (80s CSS progress bar, rotating copy, "Takes about a minute"). Steer refinement inline on screen 2.
-- Skip → sets `skipMarketOnboard` flag + `router.push('/')` to prevent infinite redirect loop.
+- Onboarding is 2-screen: interest tags/freetext → market card selection. Cards show market segments (person + problem + existing spend), not product ideas. `ExcavateLoading` full-screen component shows during the ~60s Claude crawl (80s CSS progress bar, rotating copy, "Takes about a minute"). Steer refinement inline on screen 2.
+- Skip → navigates to `/` directly (MarketGate handles routing based on market count; if 0 markets, redirects back to `/onboard`).
 - Market activated via single atomic SQL PATCH on `/market/[id]` mount — no two-statement race condition.
 - `DashboardHeader` renders immediately on market page mount (outside the PATCH spinner); only `DashboardLayout` is gated. Stats URL includes `marketId` param to avoid stale SWR cache across markets.
 
@@ -173,7 +178,6 @@ Full pipeline is wired: Market → Signal → Observation → Thesis → Validat
 
 ### localStorage Keys
 
-- `skipMarketOnboard` — skip market gate, show unscoped dashboard
 - `eval-cache` — EvaluateSignals results + synthesis, keyed by date
 - `propose-cache` — proposed thesis + obs, keyed by date
 - `validate-cache` — proposed_proven_market, keyed by `{thesisId}-{date}`

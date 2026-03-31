@@ -4,9 +4,11 @@
 
 ## The big picture
 
-When you first open the app, it asks you to define a market. That's step one of everything.
+When you first open the app, it asks you to pick a market. That's step one of everything.
 
-A market is a space you actually care about — an industry, a problem, a community you already belong to. The app organizes every signal, observation, and thesis around that market. It's your personal research workspace.
+A market is a group of people who share a specific problem and already spend money trying to solve it. Not an industry. Not a product idea. A people + problem + money combination. The app organizes every signal, observation, and thesis around that market. It's your personal research workspace.
+
+You pick the broad market at onboarding. The micro niche — the exact person and exact problem worth building for — is something you discover through the signal pipeline over days and weeks, not something you choose upfront.
 
 Once you're in, there are three columns.
 
@@ -40,10 +42,13 @@ You will see a full-screen loading state: "Finding your markets — Searching th
 
 Four market cards appear. Each shows:
 
-- A breadcrumb showing the broader market → niche
-- A bold micro-niche description — the exact person and problem
-- A price range (what people in this space pay)
+- The broad market category at the top
+- A bold headline naming the person or group (e.g. "Independent Restaurant Owners", "Food Truck Operators")
+- A description of their world — what they already pay for and why existing solutions frustrate them
+- A price range (what people in this space already spend on tools)
 - A demand badge: **proven demand**, **growing**, or **crowded**
+
+These are market segments, not product ideas. You are choosing which group of people to research — the product idea comes later, from the signal feed.
 
 Click the card that fits best. You can change it later.
 
