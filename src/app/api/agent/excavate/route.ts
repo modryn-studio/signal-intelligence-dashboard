@@ -242,15 +242,21 @@ export async function POST(req: Request): Promise<Response> {
         log.info(ctx.reqId, 'Enrich phase â€” 4 parallel calls');
         const enriched = [...stubs];
 
+        const ENRICH_TIMEOUT_MS = 45_000;
+
         await Promise.allSettled(
           stubs.map(async (stub, i) => {
             try {
-              const msg = await client.messages.create({
+              const enrichCall = client.messages.create({
                 model: 'claude-sonnet-4-6',
                 max_tokens: 512,
                 tools: [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
                 messages: [{ role: 'user', content: enrichPrompt(stub) }],
               });
+              const timeout = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('enrich timeout')), ENRICH_TIMEOUT_MS)
+              );
+              const msg = await Promise.race([enrichCall, timeout]);
               const text =
                 [...msg.content]
                   .reverse()
