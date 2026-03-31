@@ -498,7 +498,9 @@ Respond with ONLY valid JSON, no markdown fences, no explanation:
     if (marketId) {
       try {
         await sql`UPDATE markets SET scan_status = 'failed', updated_at = NOW() WHERE id = ${marketId}`;
-      } catch { /* ignore — DB may be unreachable */ }
+      } catch {
+        /* ignore — DB may be unreachable */
+      }
     }
     return Response.json({ error: 'Agent run failed' }, { status: 500 });
   }

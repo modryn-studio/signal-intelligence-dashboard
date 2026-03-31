@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { DashboardHeader } from '@/components/dashboard-header';
-import { DashboardLayout } from '@/components/dashboard-layout';
 import { Spinner } from '@/components/ui/spinner';
 import type { Market } from '@/lib/types';
 
@@ -56,16 +54,10 @@ function MarketPicker({ markets }: { markets: Market[] }) {
 
 export function MarketGate() {
   const router = useRouter();
-  const [state, setState] = useState<'loading' | 'unscoped' | 'picking'>('loading');
+  const [state, setState] = useState<'loading' | 'picking'>('loading');
   const [markets, setMarkets] = useState<Market[]>([]);
 
   useEffect(() => {
-    const skip = localStorage.getItem('skipMarketOnboard') === 'true';
-    if (skip) {
-      setState('unscoped');
-      return;
-    }
-
     fetch('/api/markets?all=1')
       .then((r) => r.json())
       .then((data: Market[]) => {
@@ -78,22 +70,13 @@ export function MarketGate() {
           setState('picking');
         }
       })
-      .catch(() => setState('unscoped')); // fail open — show unscoped dashboard
+      .catch(() => router.push('/onboard')); // fail safe — restart onboarding
   }, [router]);
 
   if (state === 'loading') {
     return (
       <div className="bg-background flex h-svh items-center justify-center">
         <Spinner className="text-muted-foreground h-5 w-5" />
-      </div>
-    );
-  }
-
-  if (state === 'unscoped') {
-    return (
-      <div className="bg-background text-foreground flex h-svh flex-col overflow-hidden">
-        <DashboardHeader />
-        <DashboardLayout />
       </div>
     );
   }

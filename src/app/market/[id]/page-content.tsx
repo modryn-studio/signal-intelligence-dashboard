@@ -66,16 +66,12 @@ export function MarketDashboard({ marketId }: { marketId: number }) {
   // Poll market for scan_status — fast while active, stop when terminal
   const { data: marketData, mutate: mutateMarket } = useSWR<{
     market: { scan_status: ScanStatus };
-  } | null>(
-    ready ? `/api/markets?id=${marketId}` : null,
-    fetcher,
-    {
-      refreshInterval: (data) => {
-        const s = data?.market?.scan_status;
-        return s === 'pending' || s === 'scanning' ? 3000 : 0;
-      },
-    }
-  );
+  } | null>(ready ? `/api/markets?id=${marketId}` : null, fetcher, {
+    refreshInterval: (data) => {
+      const s = data?.market?.scan_status;
+      return s === 'pending' || s === 'scanning' ? 3000 : 0;
+    },
+  });
 
   const scanStatus: ScanStatus = marketData?.market?.scan_status ?? 'idle';
 
@@ -107,7 +103,11 @@ export function MarketDashboard({ marketId }: { marketId: number }) {
   return (
     <div className="bg-background text-foreground flex h-svh flex-col overflow-hidden">
       <DashboardHeader marketId={marketId} />
-      <ScanBanner status={retrying ? 'scanning' : scanStatus} marketId={marketId} onRetry={handleRetry} />
+      <ScanBanner
+        status={retrying ? 'scanning' : scanStatus}
+        marketId={marketId}
+        onRetry={handleRetry}
+      />
       <DashboardLayout />
     </div>
   );

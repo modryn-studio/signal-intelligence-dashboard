@@ -72,10 +72,12 @@ export async function GET(request: NextRequest): Promise<Response> {
     const idParam = searchParams.get('id');
     if (idParam) {
       const numId = parseInt(idParam);
-      if (isNaN(numId)) return log.end(ctx, Response.json({ error: 'invalid id' }, { status: 400 }), {});
+      if (isNaN(numId))
+        return log.end(ctx, Response.json({ error: 'invalid id' }, { status: 400 }), {});
       const [market] = await sql`SELECT * FROM markets WHERE id = ${numId}`;
       if (!market) return log.end(ctx, Response.json(null), { found: false });
-      const sources = await sql`SELECT * FROM market_sources WHERE market_id = ${numId} ORDER BY created_at`;
+      const sources =
+        await sql`SELECT * FROM market_sources WHERE market_id = ${numId} ORDER BY created_at`;
       return log.end(ctx, Response.json({ market, sources }), { id: numId });
     }
 

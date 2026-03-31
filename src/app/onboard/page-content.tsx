@@ -516,9 +516,7 @@ export function OnboardContent() {
           micro_niche: market.micro_niche,
           description: market.description,
           // Pass subreddits found during enrich so discover-sources skips re-searching them
-          existing_subreddits: (
-            market.recommended_sources ?? []
-          )
+          existing_subreddits: (market.recommended_sources ?? [])
             .filter((s) => s.source_type === 'subreddit')
             .map((s) => s.value),
         }),
@@ -634,8 +632,6 @@ export function OnboardContent() {
   }
 
   function handleSkip() {
-    // Flag prevents MarketGate from redirecting back here when there are 0 markets
-    localStorage.setItem('skipMarketOnboard', 'true');
     router.push('/');
   }
 
@@ -890,23 +886,23 @@ export function OnboardContent() {
             </p>
             <div className="flex flex-col gap-1.5">
               {ALWAYS_ON_SOURCES.map((s) => {
-              const statusInfo = STATUS_STYLES[s.status] ?? STATUS_STYLES.live;
-              return (
-                <div
-                  key={s.name}
-                  className="border-border/50 bg-card/50 flex items-center gap-2 rounded border px-3 py-2"
-                >
-                  <span className="text-muted-foreground text-xs font-medium">{s.name}</span>
-                  <span
-                    className={`rounded border px-1.5 py-0.5 font-mono text-[10px] ${statusInfo.className}`}
+                const statusInfo = STATUS_STYLES[s.status] ?? STATUS_STYLES.live;
+                return (
+                  <div
+                    key={s.name}
+                    className="border-border/50 bg-card/50 flex items-center gap-2 rounded border px-3 py-2"
                   >
-                    {statusInfo.label}
-                  </span>
-                  <span className="text-muted-foreground/50 text-[11px]">·</span>
-                  <span className="text-muted-foreground/60 text-[11px]">{s.description}</span>
-                </div>
-              );
-            })}
+                    <span className="text-muted-foreground text-xs font-medium">{s.name}</span>
+                    <span
+                      className={`rounded border px-1.5 py-0.5 font-mono text-[10px] ${statusInfo.className}`}
+                    >
+                      {statusInfo.label}
+                    </span>
+                    <span className="text-muted-foreground/50 text-[11px]">·</span>
+                    <span className="text-muted-foreground/60 text-[11px]">{s.description}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
