@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import type { ExcavateChunk } from '@/app/api/agent/excavate/route';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -167,7 +168,9 @@ export function OnboardContent() {
   const [markets, setMarkets] = useState<MarketOption[]>([]);
   const [selectedSteer, setSelectedSteer] = useState<string[]>([]);
   const [steerExpanded, setSteerExpanded] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);   // full-screen loader (Phase 1 in flight)
+  const [steerLoading, setSteerLoading] = useState(false); // dim cards during steer
+  const [streamDone, setStreamDone] = useState(false); // false = Phase 2 still enriching
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -187,7 +190,19 @@ export function OnboardContent() {
 
   async function doExcavate(steerOverride?: string[]) {
     setError('');
-    setLoading(true);
+    setStreamDone(false);
+
+    const activeSteer = steerOverride ?? (selectedSteer.length ? selectedSteer : undefined);
+    // Steer path: already have markets — cheap mutation, stay on picking screen
+    const isSteer = !!(activeSteer?.length && markets.length > 0);
+
+    if (isSteer) {
+      setSteerLoading(true);
+    } else {
+      setLoading(true);
+      setMarkets([]);
+    }
+
     try {
       const res = await fetch('/api/agent/excavate', {
         method: 'POST',
@@ -195,19 +210,64 @@ export function OnboardContent() {
         body: JSON.stringify({
           tags: selectedTags,
           description: freeText.trim() || undefined,
-          steer: steerOverride ?? (selectedSteer.length ? selectedSteer : undefined),
+          steer: activeSteer,
+          existingMarkets: isSteer ? markets : undefined,
         }),
       });
-      if (!res.ok) throw new Error();
-      const data = (await res.json()) as { markets: MarketOption[] };
-      setMarkets(data.markets ?? []);
-      setSteerExpanded(false);
-      setSelectedSteer([]);
-      setStep('picking');
+
+      if (!res.ok || !res.body) throw new Error();
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let transitioned = false;
+      const arrived: MarketOption[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const chunk = JSON.parse(trimmed) as ExcavateChunk;
+            if (chunk.type === 'market') {
+              arrived.push(chunk.data);
+              setMarkets([...arrived]);
+              if (!transitioned) {
+                transitioned = true;
+                setLoading(false);
+                setSteerLoading(false);
+                if (!isSteer) setStep('picking');
+              }
+            } else if (chunk.type === 'update') {
+              setMarkets((prev) =>
+                prev.map((m) =>
+                  m.market_name === chunk.data.market_name ? { ...m, ...chunk.data } : m
+                )
+              );
+            } else if (chunk.type === 'done') {
+              setStreamDone(true);
+              setSteerExpanded(false);
+              setSelectedSteer([]);
+              setSteerLoading(false);
+            } else if (chunk.type === 'error') {
+              setError(chunk.message ?? 'Something went wrong.');
+              setLoading(false);
+              setSteerLoading(false);
+            }
+          } catch { /* ignore non-JSON lines */ }
+        }
+      }
     } catch {
       setError('Something went wrong. Try again.');
     } finally {
       setLoading(false);
+      setSteerLoading(false);
     }
   }
 
@@ -343,24 +403,35 @@ export function OnboardContent() {
           <h2 className="text-foreground mt-4 text-xl leading-snug font-semibold">
             Pick the one that fits.
           </h2>
-          <p className="text-muted-foreground mt-1 text-sm">You can change it later.</p>
+          <div className="mt-1 flex items-center gap-2">
+            <p className="text-muted-foreground text-sm">You can change it later.</p>
+            {!streamDone && (
+              <span className="text-muted-foreground/50 font-mono text-[10px] tracking-wider">
+                verifying prices…
+              </span>
+            )}
+          </div>
 
           {/* Market cards */}
-          <div className="mt-5 flex flex-col gap-3">
+          <div className={`mt-5 flex flex-col gap-3 transition-opacity ${steerLoading ? 'opacity-40 pointer-events-none' : ''}`}>
             {markets.map((market, i) => (
               <MarketCard
                 key={i}
                 market={market}
                 onSelect={() => handleSelectMarket(market)}
-                disabled={saving}
+                disabled={saving || steerLoading}
               />
+            ))}
+            {/* Skeleton cards while stream in flight */}
+            {Array.from({ length: Math.max(0, 4 - markets.length) }).map((_, i) => (
+              <SkeletonCard key={`sk-${i}`} />
             ))}
           </div>
 
           {error && <p className="text-destructive mt-3 text-xs">{error}</p>}
 
           {/* Escape hatch — inline, never navigates away */}
-          {!loading && markets.length > 0 && (
+          {markets.length > 0 && !steerLoading && (
             <div className="mt-6">
               <button
                 type="button"
