@@ -63,6 +63,11 @@ function setToCache(key: string, markets: MarketOption[]): void {
   marketCache.set(key, { markets, ts: Date.now() });
 }
 
+// â"€â"€ In-flight deduplication â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// Prevents N identical requests from spawning N × 4 Claude web_search calls.
+// All concurrent requests for the same key share one underlying execution.
+const inFlight = new Map<string, Promise<MarketOption[]>>();
+
 // â”€â”€ Parse NDJSON output from Claude â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function parseMarketLines(text: string): MarketOption[] {
@@ -173,6 +178,8 @@ export async function POST(req: Request): Promise<Response> {
   const encoder = new TextEncoder();
 
   const isSteer = !!(steer?.length && existingMarkets?.length);
+  // Signal from the HTTP request — aborts Anthropic calls when client disconnects
+  const reqSignal = req.signal;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -194,7 +201,7 @@ export async function POST(req: Request): Promise<Response> {
             messages: [
               { role: 'user', content: steerPrompt(interestSummary, existingMarkets!, steer!) },
             ],
-          });
+          }, { signal: reqSignal });
           const text = msg.content.find((b) => b.type === 'text')?.text?.trim() ?? '';
           const markets = parseMarketLines(text);
           if (markets.length === 0) {
@@ -224,7 +231,7 @@ export async function POST(req: Request): Promise<Response> {
           model: 'claude-sonnet-4-6',
           max_tokens: 2048,
           messages: [{ role: 'user', content: stubPrompt(interestSummary) }],
-        });
+        }, { signal: reqSignal });
         const stubText = stubMsg.content.find((b) => b.type === 'text')?.text?.trim() ?? '';
         const stubs = parseMarketLines(stubText);
 
@@ -234,17 +241,24 @@ export async function POST(req: Request): Promise<Response> {
           return;
         }
 
-        // Stream stubs immediately â€” user sees cards now
+        // Stream stubs immediately -- user sees cards now
         for (const m of stubs) flush({ type: 'market', data: m });
 
-        // â”€â”€ Enrich phase: 4 parallel web-search calls, one per market â”€â”€â”€â”€â”€
-        // Each call researches ONE market deeply. Updates stream as they land.
-        log.info(ctx.reqId, 'Enrich phase â€” 4 parallel calls');
+        // Enrich phase: 4 parallel web-search calls, one per market
+        // inFlight dedup: if same key already enriching, skip new request entirely.
+        // This prevents N back-clicks from spawning N x 4 Claude web_search calls.
+        log.info(ctx.reqId, 'Enrich phase -- 4 parallel calls');
         const enriched = [...stubs];
-
         const ENRICH_TIMEOUT_MS = 45_000;
 
-        await Promise.allSettled(
+        if (inFlight.has(key)) {
+          log.info(ctx.reqId, 'Enrich skipped -- already in-flight for key');
+          flush({ type: 'done' });
+          controller.close();
+          return;
+        }
+
+        const enrichRun = Promise.allSettled(
           stubs.map(async (stub, i) => {
             try {
               const enrichCall = client.messages.create({
@@ -253,10 +267,10 @@ export async function POST(req: Request): Promise<Response> {
                 tools: [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
                 messages: [{ role: 'user', content: enrichPrompt(stub) }],
               });
-              const timeout = new Promise<never>((_, reject) =>
+              const timeoutP = new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error('enrich timeout')), ENRICH_TIMEOUT_MS)
               );
-              const msg = await Promise.race([enrichCall, timeout]);
+              const msg = await Promise.race([enrichCall, timeoutP]);
               const text =
                 [...msg.content]
                   .reverse()
@@ -280,12 +294,13 @@ export async function POST(req: Request): Promise<Response> {
                 }
               }
             } catch {
-              // Individual enrichment failure is non-fatal â€” stub stays
               log.warn(ctx.reqId, `Enrich failed for market ${i}`);
             }
           })
-        );
+        ).finally(() => inFlight.delete(key));
 
+        inFlight.set(key, enrichRun as unknown as Promise<MarketOption[]>);
+        await enrichRun;
         setToCache(key, enriched);
         flush({ type: 'done' });
       } catch (error) {
