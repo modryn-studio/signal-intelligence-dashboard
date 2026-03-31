@@ -56,7 +56,11 @@ Respond with ONLY valid JSON, no markdown:
 
     const message = await withTimeout(
       client.messages.create(
-        { model: 'claude-sonnet-4-6', max_tokens: 512, messages: [{ role: 'user', content: prompt }] },
+        {
+          model: 'claude-sonnet-4-6',
+          max_tokens: 512,
+          messages: [{ role: 'user', content: prompt }],
+        },
         { signal }
       ),
       AGENT_TIMEOUT_MS

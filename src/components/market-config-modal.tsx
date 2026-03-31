@@ -151,10 +151,10 @@ export function MarketConfigModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="flex max-h-[85vh] max-w-md flex-col">
         <DialogTitle className="font-mono text-xs tracking-widest uppercase">Market</DialogTitle>
 
-        <div className="mt-4 space-y-4">
+        <div className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
           <div>
             <label className="text-foreground mb-1.5 block text-xs font-medium">Name</label>
             <Input value={name} onChange={(e) => setName(e.target.value)} className="text-sm" />

@@ -143,11 +143,13 @@ function MarketCard({
   onSelect,
   disabled,
   selected,
+  enriching,
 }: {
   market: MarketOption;
   onSelect: () => void;
   disabled: boolean;
   selected?: boolean;
+  enriching?: boolean;
 }) {
   const demand = DEMAND_STYLES[market.demand] ?? DEMAND_STYLES.growing;
 
@@ -166,16 +168,18 @@ function MarketCard({
       </p>
 
       {/* The person — who this market is */}
-      <p className="text-foreground mt-1 text-sm leading-snug font-semibold">
-        {market.niche}
-      </p>
+      <p className="text-foreground mt-1 text-sm leading-snug font-semibold">{market.niche}</p>
 
       {/* Their world — what they pay for, what frustrates them */}
       <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{market.description}</p>
 
       {/* Price + demand */}
       <div className="mt-3 flex items-center gap-2">
-        <span className="text-muted-foreground font-mono text-[11px]">{market.price_range}</span>
+        {enriching && !market.reasoning ? (
+          <span className="bg-muted-foreground/15 h-3 w-16 animate-pulse rounded" />
+        ) : (
+          <span className="text-muted-foreground font-mono text-[11px]">{market.price_range}</span>
+        )}
         <span className={`rounded border px-1.5 py-0.5 font-mono text-[10px] ${demand.className}`}>
           {demand.label}
         </span>
@@ -214,16 +218,16 @@ function ExcavateLoading({ onCancel }: { onCancel: () => void }) {
         </p>
         <h2 className="text-foreground mt-4 text-xl font-semibold">Finding your markets</h2>
         <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-          Searching the web for real demand data.
+          Researching four market segments.
           <br />
-          Takes about a minute.
+          Cards appear in about 15 seconds.
         </p>
         <div className="bg-border/50 mt-8 h-px w-full overflow-hidden">
           <div
             className="bg-primary h-full"
             style={{
               width: wide ? '92%' : '0%',
-              transition: 'width 80s linear',
+              transition: 'width 30s ease-out',
             }}
           />
         </div>
@@ -351,7 +355,13 @@ export function OnboardContent() {
 
   const abortRef = useRef<AbortController | null>(null);
 
-  function toggleTag(tag: string) {
+  // Cancel any in-flight Anthropic calls when the component unmounts
+  // (e.g. user navigates to /market/[id] after selecting)
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
     setSelectedTags((prev) => {
       if (prev.includes(tag)) return prev.filter((t) => t !== tag);
       if (prev.length >= 3) return prev; // max 3
@@ -372,6 +382,9 @@ export function OnboardContent() {
     const activeSteer = steerOverride ?? (selectedSteer.length ? selectedSteer : undefined);
     // Steer path: already have markets — cheap mutation, stay on picking screen
     const isSteer = !!(activeSteer?.length && markets.length > 0);
+
+    // Don't allow parallel excavations — steer is cheap but non-steer fires 4 web_search calls
+    if (!isSteer && loading) return;
 
     // Check localStorage cache for non-steer, non-forced runs
     if (!isSteer && !forceRefresh) {
@@ -762,6 +775,7 @@ export function OnboardContent() {
                 onSelect={() => setSelectedMarketIndex(i)}
                 selected={selectedMarketIndex === i}
                 disabled={steerLoading}
+                enriching={!streamDone}
               />
             ))}
             {/* Skeleton cards while stream in flight */}

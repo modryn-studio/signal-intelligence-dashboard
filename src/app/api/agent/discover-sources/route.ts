@@ -151,29 +151,32 @@ export async function POST(req: Request): Promise<Response> {
         log.info(ctx.reqId, 'Discovering sources', { market_name, hasSubreddits });
 
         const message = await withTimeout(
-          client.messages.create({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 2048,
-            // When subreddits already known: only need 2-3 searches for G2/Capterra. Otherwise 5.
-            tools: [
-              {
-                name: 'web_search',
-                type: 'web_search_20260209' as const,
-                max_uses: hasSubreddits ? 3 : 5,
-              },
-            ],
-            messages: [
-              {
-                role: 'user',
-                content: buildPrompt(
-                  market_name.trim(),
-                  micro_niche.trim(),
-                  description?.trim(),
-                  existing_subreddits
-                ),
-              },
-            ],
-          }),
+          client.messages.create(
+            {
+              model: 'claude-sonnet-4-6',
+              max_tokens: 2048,
+              // When subreddits already known: only need 2-3 searches for G2/Capterra. Otherwise 5.
+              tools: [
+                {
+                  name: 'web_search',
+                  type: 'web_search_20260209' as const,
+                  max_uses: hasSubreddits ? 3 : 5,
+                },
+              ],
+              messages: [
+                {
+                  role: 'user',
+                  content: buildPrompt(
+                    market_name.trim(),
+                    micro_niche.trim(),
+                    description?.trim(),
+                    existing_subreddits
+                  ),
+                },
+              ],
+            },
+            { signal: req.signal }
+          ),
           WEB_SEARCH_TIMEOUT_MS
         );
 

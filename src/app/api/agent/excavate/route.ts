@@ -86,7 +86,7 @@ function parseMarketLines(text: string): MarketOption[] {
 
 // â”€â”€ Prompts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const STUB_LINE = `{"overall_market":"...","niche":"...","micro_niche":"...","market_name":"...","price_range":"~$?","demand":"proven|growing|crowded","description":"...","recommended_sources":[]}`;
+const STUB_LINE = `{"overall_market":"...","niche":"...","micro_niche":"...","market_name":"...","price_range":"$29-149/mo","demand":"proven|growing|crowded","description":"...","recommended_sources":[]}`;
 
 // NOTE: micro_niche is still in the type for downstream use, but the stub prompt
 // no longer asks Claude to target it precisely. It gets a broad "who + frustration"
@@ -104,7 +104,7 @@ Generate exactly 4 DISTINCT market segments. Each must describe:
 - niche: a specific segment within it (e.g. "Independent Restaurant Owners", "Freelance Designers")
 - micro_niche: the person and their core frustration in one phrase (e.g. "Independent restaurant owners frustrated by food cost visibility")
 - market_name: 2-4 words naming the PERSON, not a product (e.g. "Independent Restaurant Owners", "Food Truck Operators", "Freelance Designers"). This is the card headline.
-- price_range: what these people already pay for existing tools, e.g. "$29-149/mo"
+- price_range: realistic estimate of what these people already pay for tools in this space, based on your training data. Use a range like "$19-79/mo". Enrich will verify with web search.
 - demand: 'proven' = multiple paid tools exist | 'growing' = market exists, tools still maturing | 'crowded' = saturated, hard to differentiate
 - description: 1-2 sentences describing who these people are, what they currently pay for, and why existing solutions frustrate them. No product suggestions.
 
@@ -281,12 +281,17 @@ export async function POST(req: Request): Promise<Response> {
         const enrichRun = Promise.allSettled(
           stubs.map(async (stub, i) => {
             try {
-              const enrichCall = client.messages.create({
-                model: 'claude-sonnet-4-6',
-                max_tokens: 512,
-                tools: [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
-                messages: [{ role: 'user', content: enrichPrompt(stub) }],
-              });
+              const enrichCall = client.messages.create(
+                {
+                  model: 'claude-sonnet-4-6',
+                  max_tokens: 2048,
+                  tools: [
+                    { name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 },
+                  ],
+                  messages: [{ role: 'user', content: enrichPrompt(stub) }],
+                },
+                { signal: reqSignal }
+              );
               const timeoutP = new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error('enrich timeout')), ENRICH_TIMEOUT_MS)
               );
@@ -313,8 +318,8 @@ export async function POST(req: Request): Promise<Response> {
                   /* ignore non-JSON */
                 }
               }
-            } catch {
-              log.warn(ctx.reqId, `Enrich failed for market ${i}`);
+            } catch (err) {
+              log.warn(ctx.reqId, `Enrich failed for market ${i}: ${String(err)}`);
             }
           })
         ).finally(() => inFlight.delete(key));

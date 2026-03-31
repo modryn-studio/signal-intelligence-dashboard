@@ -16,7 +16,6 @@ export async function POST(request: Request): Promise<Response> {
   const ctx = log.begin();
   const { signal } = request;
   try {
-
     // Pull last 30 observations across all dates, newest first
     const rows = (await sql`
       SELECT id, title, body, date
@@ -73,7 +72,11 @@ Respond with ONLY valid JSON, no markdown:
 
     const message = await withTimeout(
       client.messages.create(
-        { model: 'claude-sonnet-4-6', max_tokens: 512, messages: [{ role: 'user', content: prompt }] },
+        {
+          model: 'claude-sonnet-4-6',
+          max_tokens: 512,
+          messages: [{ role: 'user', content: prompt }],
+        },
         { signal }
       ),
       AGENT_TIMEOUT_MS

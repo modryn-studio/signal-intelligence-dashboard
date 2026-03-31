@@ -57,14 +57,14 @@ export function ObservationTruthPickerModal({
   return (
     <>
       <Dialog open={open && !createOpen} onOpenChange={onClose}>
-        <DialogContent className="bg-card border-border max-w-md">
+        <DialogContent className="bg-card border-border flex max-h-[85vh] max-w-md flex-col">
           <DialogHeader>
             <DialogTitle className="text-muted-foreground font-mono text-xs tracking-widest uppercase">
               Add to thesis
             </DialogTitle>
           </DialogHeader>
 
-          <div className="mt-2 flex flex-col gap-2">
+          <div className="mt-2 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
             {activeTruths.length === 0 && (
               <p className="text-muted-foreground py-6 text-center text-xs">
                 No active theses. Create one below.

@@ -428,11 +428,14 @@ Respond with ONLY valid JSON, no markdown fences, no explanation:
 
       log.info(ctx.reqId, 'Calling claude-sonnet-4-6', { items: allItems.length });
       const message = await withTimeout(
-        client.messages.create({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 2048,
-          messages: [{ role: 'user', content: prompt }],
-        }),
+        client.messages.create(
+          {
+            model: 'claude-sonnet-4-6',
+            max_tokens: 2048,
+            messages: [{ role: 'user', content: prompt }],
+          },
+          { signal: req.signal }
+        ),
         AGENT_TIMEOUT_MS
       );
 

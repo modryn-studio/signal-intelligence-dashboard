@@ -127,7 +127,8 @@ async function fetchContent(signal: SignalRow): Promise<string> {
 async function evaluateOne(
   client: Anthropic,
   signal: SignalRow & { content: string },
-  question: string
+  question: string,
+  reqSignal?: AbortSignal
 ): Promise<EvaluationResult | null> {
   const prompt = `You are a brutal signal filter. Most signals are noise. Your job is to find the 2–4 signals worth acting on — not to validate everything.
 
@@ -172,14 +173,17 @@ or
 
   try {
     const message = await withTimeout(
-      client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 512,
-        tools: signal.content
-          ? []
-          : [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
-        messages: [{ role: 'user', content: prompt }],
-      }),
+      client.messages.create(
+        {
+          model: 'claude-sonnet-4-6',
+          max_tokens: 512,
+          tools: signal.content
+            ? []
+            : [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
+          messages: [{ role: 'user', content: prompt }],
+        },
+        { signal: reqSignal }
+      ),
       signal.content ? AGENT_TIMEOUT_MS : WEB_SEARCH_TIMEOUT_MS
     );
 
@@ -226,6 +230,7 @@ or
 
 export async function POST(req: Request): Promise<Response> {
   const ctx = log.begin();
+  const reqSignal = req.signal;
 
   const body = (await req.json().catch(() => ({}))) as { date?: string };
   const date = body.date ?? new Date().toISOString().split('T')[0];
@@ -292,7 +297,7 @@ export async function POST(req: Request): Promise<Response> {
           await Promise.all(
             batch.map(async (s) => {
               const content = await fetchContent(s);
-              const result = await evaluateOne(client, { ...s, content }, question);
+              const result = await evaluateOne(client, { ...s, content }, question, reqSignal);
               if (result) {
                 evaluations.push(result);
                 flush({ type: 'result', evaluation: result });
@@ -338,12 +343,15 @@ Respond with ONLY valid JSON, no markdown:
 
           try {
             const synthMsg = await withTimeout(
-              client.messages.create({
-                model: 'claude-sonnet-4-6',
-                max_tokens: 512,
-                tools: [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
-                messages: [{ role: 'user', content: synthPrompt }],
-              }),
+              client.messages.create(
+                {
+                  model: 'claude-sonnet-4-6',
+                  max_tokens: 512,
+                  tools: [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
+                  messages: [{ role: 'user', content: synthPrompt }],
+                },
+                { signal: reqSignal }
+              ),
               WEB_SEARCH_TIMEOUT_MS
             );
             const lastText = [...synthMsg.content].reverse().find((b) => b.type === 'text');
