@@ -88,36 +88,48 @@ function parseMarketLines(text: string): MarketOption[] {
 
 const STUB_LINE = `{"overall_market":"...","niche":"...","micro_niche":"...","market_name":"...","price_range":"~$?","demand":"proven|growing|crowded","description":"...","recommended_sources":[]}`;
 
+// NOTE: micro_niche is still in the type for downstream use, but the stub prompt
+// no longer asks Claude to target it precisely. It gets a broad "who + frustration"
+// and the real micro niche emerges from the signal feed over time.
+
 function stubPrompt(interestSummary: string): string {
-  return `You are helping a solo developer find the right market to build in.
+  return `You are helping a solo developer choose which market to research.
+
+A "market" is a group of people who share a specific problem and already spend money trying to solve it. Not an industry. Not a product idea. A people + problem + money combination.
 
 ${interestSummary}
 
-Generate exactly 4 DISTINCT market options. Each must name:
-- overall_market: the broad world (e.g. "Freelancers")
-- niche: a specific segment (e.g. "Freelance Designers")
-- micro_niche: exact person + exact problem (e.g. "Freelance Designers who can't get clients to pay on time")
-- market_name: 2â€“5 word card title shown to the user (e.g. "Freelance Designer Invoice Recovery")
-- price_range: your best knowledge estimate, e.g. "$15â€“50/mo" â€” will be verified next
-- demand: 'proven' = paid tools clearly exist | 'growing' = market exists, tools still maturing | 'crowded' = hard to differentiate
-- description: one sentence describing the exact person and problem
+Generate exactly 4 DISTINCT market segments. Each must describe:
+- overall_market: the broad world (e.g. "Restaurants", "Freelancers")
+- niche: a specific segment within it (e.g. "Independent Restaurant Owners", "Freelance Designers")
+- micro_niche: the person and their core frustration in one phrase (e.g. "Independent restaurant owners frustrated by food cost visibility")
+- market_name: 2-4 words naming the PERSON, not a product (e.g. "Independent Restaurant Owners", "Food Truck Operators", "Freelance Designers"). This is the card headline.
+- price_range: what these people already pay for existing tools, e.g. "$29-149/mo"
+- demand: 'proven' = multiple paid tools exist | 'growing' = market exists, tools still maturing | 'crowded' = saturated, hard to differentiate
+- description: 1-2 sentences describing who these people are, what they currently pay for, and why existing solutions frustrate them. No product suggestions.
+
+Rules:
+- Do NOT suggest product ideas, tool names, or solution concepts. Describe the market, not what to build.
+- The market_name must be the PERSON or GROUP, never a product name.
+- The description should make the reader think "yes, these are my people" — not "here's what I should build."
+- Each market should feel like a door you walk through, not a destination.
 
 Output each market as a JSON object on its own line (NDJSON). Nothing else:
 ${STUB_LINE}`;
 }
 
 function enrichPrompt(market: MarketOption): string {
-  return `Research this market for a solo developer:
+  return `Research this market segment for a solo developer:
 
 Market: ${market.market_name}
-Description: ${market.micro_niche}
+Who they are: ${market.micro_niche}
 
 Use web_search to find:
-1. Real competing products that charge money in this space â€” find their actual pricing (not guesses). Update price_range to reflect what you found (e.g. "$29â€“149/mo").
-2. 2â€“4 active subreddits where the MARKET USERS (not developers) vent, ask for help, or discuss this problem. Verify each subreddit exists and is active. Exclude: r/SaaS, r/Entrepreneur, r/startups, r/indiehackers.
+1. Real tools these people currently pay for in this space. Find actual pricing (not guesses). Update price_range to reflect what they already spend (e.g. "$29–149/mo"). Name 2–3 specific products in the reasoning field.
+2. 2–4 active subreddits where these people (not developers, not founders) vent, ask for help, or discuss their problems. Verify each subreddit exists and is active. Exclude: r/SaaS, r/Entrepreneur, r/startups, r/indiehackers.
 3. Update demand to 'proven' if you found multiple paid tools with clear pricing, 'crowded' if the space is saturated, 'growing' if tools exist but market is still developing.
 
-Output a single JSON object on one line with your findings. Include a brief reasoning field:
+Output a single JSON object on one line with your findings. Include a brief reasoning field that names specific competing products and their prices:
 {"market_name":"${market.market_name}","price_range":"...","demand":"proven|growing|crowded","recommended_sources":[{"source_type":"subreddit","value":"..."}],"reasoning":"..."}`;
 }
 
@@ -130,16 +142,18 @@ function steerPrompt(
     ? 'Generate markets from a COMPLETELY DIFFERENT category cluster â€” do not use the interests above as the primary lens. Find an unrelated space where their background could still be an edge.'
     : `Apply these as modifiers: ${steer.join(', ')}. Keep the core interests but adjust direction accordingly.`;
 
-  return `A solo developer interested in "${interestSummary}" was shown these 4 market options:
+  return `A solo developer interested in "${interestSummary}" was shown these 4 market segments:
 ${JSON.stringify(
-  existingMarkets.map(({ market_name, micro_niche }) => ({ market_name, micro_niche })),
+  existingMarkets.map(({ market_name, description }) => ({ market_name, description })),
   null,
   2
 )}
 
 They want to refine. ${steerContext}
 
-Generate 4 NEW distinct market options. Use your knowledge for price_range â€” no web search needed. same format, one JSON object per line:
+Generate 4 NEW distinct market segments. Each market_name must be the PERSON or GROUP (e.g. "Food Truck Operators"), never a product name. Description should cover who they are, what they pay for, and what frustrates them. No product suggestions.
+
+Use your knowledge for price_range. Same format, one JSON object per line:
 ${STUB_LINE}`;
 }
 
@@ -195,13 +209,16 @@ export async function POST(req: Request): Promise<Response> {
         // â”€â”€ Steer path: cheap mutation, no web search (~5â€“10s) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (isSteer) {
           log.info(ctx.reqId, 'Steer path', { steer, existingCount: existingMarkets!.length });
-          const msg = await client.messages.create({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 2048,
-            messages: [
-              { role: 'user', content: steerPrompt(interestSummary, existingMarkets!, steer!) },
-            ],
-          }, { signal: reqSignal });
+          const msg = await client.messages.create(
+            {
+              model: 'claude-sonnet-4-6',
+              max_tokens: 2048,
+              messages: [
+                { role: 'user', content: steerPrompt(interestSummary, existingMarkets!, steer!) },
+              ],
+            },
+            { signal: reqSignal }
+          );
           const text = msg.content.find((b) => b.type === 'text')?.text?.trim() ?? '';
           const markets = parseMarketLines(text);
           if (markets.length === 0) {
@@ -227,11 +244,14 @@ export async function POST(req: Request): Promise<Response> {
 
         // â”€â”€ Stub phase: fast generation, no web search (~5s) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         log.info(ctx.reqId, 'Stub phase', { tags, hasDescription: !!description });
-        const stubMsg = await client.messages.create({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 2048,
-          messages: [{ role: 'user', content: stubPrompt(interestSummary) }],
-        }, { signal: reqSignal });
+        const stubMsg = await client.messages.create(
+          {
+            model: 'claude-sonnet-4-6',
+            max_tokens: 2048,
+            messages: [{ role: 'user', content: stubPrompt(interestSummary) }],
+          },
+          { signal: reqSignal }
+        );
         const stubText = stubMsg.content.find((b) => b.type === 'text')?.text?.trim() ?? '';
         const stubs = parseMarketLines(stubText);
 

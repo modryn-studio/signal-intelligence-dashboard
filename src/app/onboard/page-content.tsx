@@ -160,18 +160,18 @@ function MarketCard({
         selected ? 'border-primary ring-primary/20 ring-2' : 'border-border hover:border-primary/50'
       }`}
     >
-      {/* Three-layer breadcrumb */}
+      {/* Breadcrumb */}
       <p className="text-muted-foreground font-mono text-[10px] tracking-widest">
-        {market.overall_market} · {market.niche}
+        {market.overall_market}
       </p>
 
-      {/* Micro niche name — the thing you build for */}
+      {/* The person — who this market is */}
       <p className="text-foreground mt-1 text-sm leading-snug font-semibold">
-        {market.market_name}
+        {market.niche}
       </p>
 
-      {/* Exact person + problem */}
-      <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{market.micro_niche}</p>
+      {/* Their world — what they pay for, what frustrates them */}
+      <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{market.description}</p>
 
       {/* Price + demand */}
       <div className="mt-3 flex items-center gap-2">
@@ -612,8 +612,8 @@ export function OnboardContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: pendingMarket.market_name,
-          description: pendingMarket.micro_niche,
+          name: pendingMarket.niche,
+          description: pendingMarket.description,
           sources: deduped,
         }),
       });
@@ -871,7 +871,7 @@ export function OnboardContent() {
           </button>
 
           <p className="text-primary mt-4 font-mono text-[10px] tracking-widest uppercase">
-            {pendingMarket.market_name}
+            {pendingMarket.niche}
           </p>
           <h2 className="text-foreground mt-2 text-xl leading-snug font-semibold">
             Signal sources
