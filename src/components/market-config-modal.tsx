@@ -25,6 +25,14 @@ const STATUS_STYLES: Record<string, { label: string; className: string }> = {
   inactive: { label: 'inactive', className: 'text-muted-foreground/50 border-border/50' },
 };
 
+const ALWAYS_ON_SOURCES = [
+  { name: 'Hacker News', description: 'Top stories >30 points, daily', status: 'live' },
+  { name: 'Product Hunt', description: 'Top 20 launches by votes', status: 'needs_api_key' },
+  { name: 'Indie Hackers', description: 'Top weekly posts', status: 'fragile' },
+  { name: 'r/SaaS', description: 'Top daily posts', status: 'live' },
+  { name: 'r/Entrepreneur', description: 'Top daily posts', status: 'live' },
+] as const;
+
 const SOURCE_TYPE_OPTIONS: { value: SourceType; label: string; placeholder: string }[] = [
   { value: 'subreddit', label: 'Subreddit', placeholder: 'subreddit name' },
   { value: 'g2_product', label: 'G2 Product', placeholder: 'product slug' },
@@ -159,6 +167,36 @@ export function MarketConfigModal({
               rows={3}
               className="resize-none text-sm"
             />
+          </div>
+
+          {/* Always-on sources — read-only, visible so users know what's running */}
+          <div>
+            <label className="text-foreground mb-2 block text-xs font-medium">
+              Always included
+            </label>
+            <div className="space-y-1.5">
+              {ALWAYS_ON_SOURCES.map((s) => {
+                const statusInfo = STATUS_STYLES[s.status] ?? STATUS_STYLES.live;
+                return (
+                  <div
+                    key={s.name}
+                    className="border-border/40 bg-card/40 flex items-center gap-2 rounded border px-3 py-1.5"
+                  >
+                    <span className="text-muted-foreground shrink-0 text-xs font-medium">
+                      {s.name}
+                    </span>
+                    <span
+                      className={`shrink-0 rounded border px-1.5 py-px font-mono text-[10px] ${statusInfo.className}`}
+                    >
+                      {statusInfo.label}
+                    </span>
+                    <span className="text-muted-foreground/50 min-w-0 truncate text-[11px]">
+                      {s.description}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Signal sources */}

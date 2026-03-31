@@ -242,11 +242,11 @@ function ExcavateLoading({ onCancel }: { onCancel: () => void }) {
 
 // Always-on sources — not stored in market_sources, always fetched by agent/run
 const ALWAYS_ON_SOURCES = [
-  { name: 'Hacker News', description: 'Top stories >30 points, daily' },
-  { name: 'Product Hunt', description: 'Top 20 launches by votes' },
-  { name: 'Indie Hackers', description: 'Top weekly posts' },
-  { name: 'r/SaaS', description: 'Top daily posts' },
-  { name: 'r/Entrepreneur', description: 'Top daily posts' },
+  { name: 'Hacker News', description: 'Top stories >30 points, daily', status: 'live' },
+  { name: 'Product Hunt', description: 'Top 20 launches by votes', status: 'needs_api_key' },
+  { name: 'Indie Hackers', description: 'Top weekly posts', status: 'fragile' },
+  { name: 'r/SaaS', description: 'Top daily posts', status: 'live' },
+  { name: 'r/Entrepreneur', description: 'Top daily posts', status: 'live' },
 ] as const;
 
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
@@ -515,6 +515,12 @@ export function OnboardContent() {
           market_name: market.market_name,
           micro_niche: market.micro_niche,
           description: market.description,
+          // Pass subreddits found during enrich so discover-sources skips re-searching them
+          existing_subreddits: (
+            market.recommended_sources ?? []
+          )
+            .filter((s) => s.source_type === 'subreddit')
+            .map((s) => s.value),
         }),
         signal: controller.signal,
       });
@@ -883,16 +889,24 @@ export function OnboardContent() {
               Always on
             </p>
             <div className="flex flex-col gap-1.5">
-              {ALWAYS_ON_SOURCES.map((s) => (
+              {ALWAYS_ON_SOURCES.map((s) => {
+              const statusInfo = STATUS_STYLES[s.status] ?? STATUS_STYLES.live;
+              return (
                 <div
                   key={s.name}
                   className="border-border/50 bg-card/50 flex items-center gap-2 rounded border px-3 py-2"
                 >
                   <span className="text-muted-foreground text-xs font-medium">{s.name}</span>
+                  <span
+                    className={`rounded border px-1.5 py-0.5 font-mono text-[10px] ${statusInfo.className}`}
+                  >
+                    {statusInfo.label}
+                  </span>
                   <span className="text-muted-foreground/50 text-[11px]">·</span>
                   <span className="text-muted-foreground/60 text-[11px]">{s.description}</span>
                 </div>
-              ))}
+              );
+            })}
             </div>
           </div>
 

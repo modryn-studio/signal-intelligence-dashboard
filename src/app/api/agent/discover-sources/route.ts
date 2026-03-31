@@ -22,25 +22,38 @@ interface DiscoverBody {
   market_name: string;
   micro_niche: string;
   description?: string;
+  existing_subreddits?: string[];
 }
 
 // ── Prompt ─────────────────────────────────────────────────────────────────
 
 const SOURCE_FORMAT = `{"source_type":"subreddit|g2_product|capterra_product","value":"...","display_name":"...","description":"...","status":"live|fragile"}`;
 
-function buildPrompt(marketName: string, microNiche: string, description?: string): string {
+function buildPrompt(
+  marketName: string,
+  microNiche: string,
+  description?: string,
+  existingSubreddits?: string[]
+): string {
+  const hasSubreddits = existingSubreddits && existingSubreddits.length > 0;
+
+  const subredditBlock = hasSubreddits
+    ? `Subreddits already found for this market — skip subreddit discovery entirely:\n${existingSubreddits!.map((s) => `- r/${s}`).join('\n')}\n`
+    : `1. **2–4 subreddits** where the market's USERS (not founders, not developers) discuss pain points, ask for recommendations, or complain about existing tools. Communities where the actual customers hang out. Do NOT include r/SaaS, r/Entrepreneur, r/startups, r/indiehackers — those are already included by default.\n`;
+
+  const numberedG2 = hasSubreddits ? '1' : '2';
+  const numberedCap = hasSubreddits ? '2' : '3';
+
   return `You are researching signal sources for a solo developer entering the "${marketName}" market.
 
 The micro-niche: ${microNiche}${description ? `\nAdditional context: ${description}` : ''}
 
 Find the REAL places where users of existing tools in this space talk, complain, and review products. Use web_search to verify each source actually exists.
 
-Find:
-1. **2–4 subreddits** where the market's USERS (not founders, not developers) discuss pain points, ask for recommendations, or complain about existing tools. These should be communities where the actual customers hang out. Do NOT include r/SaaS, r/Entrepreneur, r/startups, r/indiehackers — those are already included by default.
+${hasSubreddits ? subredditBlock + '\nFind:\n' : 'Find:\n' + subredditBlock}
+${numberedG2}. **1–3 G2 product pages** for the top competing tools in this space. These are the products whose 2–3 star reviews reveal exactly what's broken. Find the actual G2 product slug (the part after g2.com/products/).
 
-2. **1–3 G2 product pages** for the top competing tools in this space. These are the products whose 2–3 star reviews reveal exactly what's broken. Find the actual G2 product slug (the part after g2.com/products/).
-
-3. **1–2 Capterra product pages** for competing tools. Find the actual Capterra product slug.
+${numberedCap}. **1–2 Capterra product pages** for competing tools. Find the actual Capterra product slug.
 
 For each source, output ONE JSON object per line (NDJSON):
 - source_type: "subreddit" | "g2_product" | "capterra_product"
@@ -50,7 +63,6 @@ For each source, output ONE JSON object per line (NDJSON):
 - status: "live" for subreddits (public API), "fragile" for G2/Capterra (HTML scraping, can break)
 
 Rules:
-- Every subreddit must be a REAL, active community you verified via web search
 - Every G2/Capterra product must be a real product page you verified via web search
 - Output ONLY the JSON lines — no explanation, no markdown, no array wrapper
 
@@ -81,7 +93,7 @@ export async function POST(req: Request): Promise<Response> {
   const ctx = log.begin();
 
   const body = (await req.json().catch(() => ({}))) as DiscoverBody;
-  const { market_name, micro_niche, description } = body;
+  const { market_name, micro_niche, description, existing_subreddits } = body;
 
   if (!market_name?.trim() || !micro_niche?.trim()) {
     return log.end(
@@ -113,16 +125,23 @@ export async function POST(req: Request): Promise<Response> {
       }
 
       try {
-        log.info(ctx.reqId, 'Discovering sources', { market_name });
+        const hasSubreddits = existing_subreddits && existing_subreddits.length > 0;
+        log.info(ctx.reqId, 'Discovering sources', { market_name, hasSubreddits });
 
         const message = await client.messages.create({
           model: 'claude-sonnet-4-6',
           max_tokens: 2048,
-          tools: [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 5 }],
+          // When subreddits already known: only need 2-3 searches for G2/Capterra. Otherwise 5.
+          tools: [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: hasSubreddits ? 3 : 5 }],
           messages: [
             {
               role: 'user',
-              content: buildPrompt(market_name.trim(), micro_niche.trim(), description?.trim()),
+              content: buildPrompt(
+                market_name.trim(),
+                micro_niche.trim(),
+                description?.trim(),
+                existing_subreddits
+              ),
             },
           ],
         });

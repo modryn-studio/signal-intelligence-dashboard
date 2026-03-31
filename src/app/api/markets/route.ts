@@ -39,6 +39,10 @@ void sql`ALTER TABLE market_sources ADD COLUMN IF NOT EXISTS last_pull_at TIMEST
   () => {}
 );
 
+void sql`ALTER TABLE markets ADD COLUMN IF NOT EXISTS scan_status TEXT NOT NULL DEFAULT 'idle'`.catch(
+  () => {}
+);
+
 void sql`ALTER TABLE signal_inputs ADD COLUMN IF NOT EXISTS market_id INT REFERENCES markets(id)`.catch(
   () => {}
 );
@@ -63,6 +67,16 @@ export async function GET(request: NextRequest): Promise<Response> {
         ORDER BY m.updated_at DESC
       `;
       return log.end(ctx, Response.json(markets), { count: markets.length });
+    }
+
+    const idParam = searchParams.get('id');
+    if (idParam) {
+      const numId = parseInt(idParam);
+      if (isNaN(numId)) return log.end(ctx, Response.json({ error: 'invalid id' }, { status: 400 }), {});
+      const [market] = await sql`SELECT * FROM markets WHERE id = ${numId}`;
+      if (!market) return log.end(ctx, Response.json(null), { found: false });
+      const sources = await sql`SELECT * FROM market_sources WHERE market_id = ${numId} ORDER BY created_at`;
+      return log.end(ctx, Response.json({ market, sources }), { id: numId });
     }
 
     const [market] = await sql`SELECT * FROM markets WHERE is_active = true LIMIT 1`;
@@ -107,8 +121,8 @@ export async function POST(request: NextRequest): Promise<Response> {
     await sql`UPDATE markets SET is_active = false, updated_at = NOW()`;
 
     const [market] = await sql`
-      INSERT INTO markets (name, description, is_active)
-      VALUES (${name.trim()}, ${description?.trim() || null}, true)
+      INSERT INTO markets (name, description, is_active, scan_status)
+      VALUES (${name.trim()}, ${description?.trim() || null}, true, 'pending')
       RETURNING *
     `;
     const marketId = (market as { id: number }).id;
@@ -151,6 +165,7 @@ export async function PATCH(request: NextRequest): Promise<Response> {
       name?: string;
       description?: string;
       is_active?: boolean;
+      scan_status?: string;
       addSource?: {
         source_type?: string;
         value: string;
@@ -167,6 +182,7 @@ export async function PATCH(request: NextRequest): Promise<Response> {
       name,
       description,
       is_active,
+      scan_status,
       addSource,
       removeSourceId,
       toggleSourceId,
@@ -191,6 +207,10 @@ export async function PATCH(request: NextRequest): Promise<Response> {
           updated_at = NOW()
         WHERE id = ${id}
       `;
+    }
+
+    if (scan_status !== undefined) {
+      await sql`UPDATE markets SET scan_status = ${scan_status}, updated_at = NOW() WHERE id = ${id}`;
     }
 
     if (addSource?.value?.trim()) {

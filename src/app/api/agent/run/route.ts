@@ -283,6 +283,7 @@ async function fetchCapterraReviews(productSlug: string): Promise<FetchedItem[]>
 
 export async function POST(req: Request): Promise<Response> {
   const ctx = log.begin();
+  let marketId: number | null = null;
   try {
     // Client passes today's local date so agent stamps signals correctly regardless of server timezone
     let today: string;
@@ -296,11 +297,15 @@ export async function POST(req: Request): Promise<Response> {
     log.info(ctx.reqId, 'Fetching sources', { question });
 
     // Resolve active market for scoping + custom sources
-    const marketId = await getActiveMarketId();
+    marketId = await getActiveMarketId();
     let marketContext = '';
     let customSubreddits: string[] = [];
     let g2Slugs: { id: number; value: string }[] = [];
     let capterraSlugs: { id: number; value: string }[] = [];
+
+    if (marketId) {
+      await sql`UPDATE markets SET scan_status = 'scanning', updated_at = NOW() WHERE id = ${marketId}`;
+    }
 
     if (marketId) {
       const [market] = (await sql`
@@ -480,12 +485,21 @@ Respond with ONLY valid JSON, no markdown fences, no explanation:
       logged++;
     }
 
+    if (marketId) {
+      await sql`UPDATE markets SET scan_status = 'done', updated_at = NOW() WHERE id = ${marketId}`;
+    }
+
     return log.end(ctx, Response.json({ logged, fetched: allItems.length, question }), {
       logged,
       fetched: allItems.length,
     });
   } catch (error) {
     log.err(ctx, error);
+    if (marketId) {
+      try {
+        await sql`UPDATE markets SET scan_status = 'failed', updated_at = NOW() WHERE id = ${marketId}`;
+      } catch { /* ignore — DB may be unreachable */ }
+    }
     return Response.json({ error: 'Agent run failed' }, { status: 500 });
   }
 }

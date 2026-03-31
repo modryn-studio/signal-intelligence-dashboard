@@ -37,11 +37,14 @@ export interface ContrarianTruth {
   updated_at: string;
 }
 
+export type ScanStatus = 'idle' | 'pending' | 'scanning' | 'done' | 'failed';
+
 export interface Market {
   id: number;
   name: string;
   description: string | null;
   is_active: boolean;
+  scan_status: ScanStatus;
   created_at: string;
   updated_at: string;
   signal_count?: number;
