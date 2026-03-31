@@ -440,6 +440,9 @@ export function OnboardContent() {
                 if (!isSteer) setStep('picking');
               }
             } else if (chunk.type === 'update') {
+              // Apply to local arrived array so the cache gets enriched data
+              const idx = arrived.findIndex((m) => m.market_name === chunk.data.market_name);
+              if (idx !== -1) arrived[idx] = { ...arrived[idx], ...chunk.data };
               setMarkets((prev) =>
                 prev.map((m) =>
                   m.market_name === chunk.data.market_name ? { ...m, ...chunk.data } : m
