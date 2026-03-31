@@ -746,7 +746,10 @@ export function OnboardContent() {
         <div className="w-full max-w-sm">
           <button
             type="button"
-            onClick={() => setStep('interests')}
+            onClick={() => {
+              abortRef.current?.abort();
+              setStep('interests');
+            }}
             className="text-muted-foreground/50 hover:text-muted-foreground text-xs transition-colors"
           >
             ← Back
@@ -872,6 +875,7 @@ export function OnboardContent() {
           <button
             type="button"
             onClick={() => {
+              abortRef.current?.abort();
               setStep('picking');
               setPendingMarket(null);
               setDiscoveredSources([]);
