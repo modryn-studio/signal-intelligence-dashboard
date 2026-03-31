@@ -230,7 +230,9 @@ or
 
 export async function POST(req: Request): Promise<Response> {
   const ctx = log.begin();
-  const reqSignal = req.signal;
+  // req.signal does NOT fire inside a streaming response's start() callback —
+  // use a local AbortController aborted via the stream's cancel() instead.
+  const streamAbort = new AbortController();
 
   const body = (await req.json().catch(() => ({}))) as { date?: string };
   const date = body.date ?? new Date().toISOString().split('T')[0];
@@ -297,7 +299,7 @@ export async function POST(req: Request): Promise<Response> {
           await Promise.all(
             batch.map(async (s) => {
               const content = await fetchContent(s);
-              const result = await evaluateOne(client, { ...s, content }, question, reqSignal);
+              const result = await evaluateOne(client, { ...s, content }, question, streamAbort.signal);
               if (result) {
                 evaluations.push(result);
                 flush({ type: 'result', evaluation: result });
@@ -352,7 +354,7 @@ Respond with ONLY valid JSON, no markdown:
                   ],
                   messages: [{ role: 'user', content: synthPrompt }],
                 },
-                { signal: reqSignal }
+                { signal: streamAbort.signal }
               ),
               WEB_SEARCH_TIMEOUT_MS
             );
@@ -376,6 +378,10 @@ Respond with ONLY valid JSON, no markdown:
         flush({ type: 'error', message: 'Evaluation failed' });
         controller.close();
       }
+    },
+    cancel() {
+      // Client disconnected mid-stream — abort all in-flight Anthropic calls immediately
+      streamAbort.abort();
     },
   });
 

@@ -117,6 +117,9 @@ export async function POST(req: Request): Promise<Response> {
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const encoder = new TextEncoder();
+  // req.signal does NOT fire inside a streaming response's start() callback —
+  // use a local AbortController aborted via the stream's cancel() instead.
+  const streamAbort = new AbortController();
 
   // If same market is already being sourced, return immediately to avoid duplicate web_search billing
   const flightKey = market_name.trim().toLowerCase();
@@ -175,7 +178,7 @@ export async function POST(req: Request): Promise<Response> {
                 },
               ],
             },
-            { signal: req.signal }
+            { signal: streamAbort.signal }
           ),
           WEB_SEARCH_TIMEOUT_MS
         );
@@ -202,6 +205,10 @@ export async function POST(req: Request): Promise<Response> {
       }
 
       controller.close();
+    },
+    cancel() {
+      // Client disconnected mid-stream — abort all in-flight Anthropic calls immediately
+      streamAbort.abort();
     },
   });
 

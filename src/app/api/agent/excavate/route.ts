@@ -192,8 +192,9 @@ export async function POST(req: Request): Promise<Response> {
   const encoder = new TextEncoder();
 
   const isSteer = !!(steer?.length && existingMarkets?.length);
-  // Signal from the HTTP request — aborts Anthropic calls when client disconnects
-  const reqSignal = req.signal;
+  // req.signal does NOT fire inside a streaming response's start() callback —
+  // use a local AbortController aborted via the stream's cancel() instead.
+  const streamAbort = new AbortController();
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -217,7 +218,7 @@ export async function POST(req: Request): Promise<Response> {
                 { role: 'user', content: steerPrompt(interestSummary, existingMarkets!, steer!) },
               ],
             },
-            { signal: reqSignal }
+            { signal: streamAbort.signal }
           );
           const text = msg.content.find((b) => b.type === 'text')?.text?.trim() ?? '';
           const markets = parseMarketLines(text);
@@ -250,7 +251,7 @@ export async function POST(req: Request): Promise<Response> {
             max_tokens: 2048,
             messages: [{ role: 'user', content: stubPrompt(interestSummary) }],
           },
-          { signal: reqSignal }
+          { signal: streamAbort.signal }
         );
         const stubText = stubMsg.content.find((b) => b.type === 'text')?.text?.trim() ?? '';
         const stubs = parseMarketLines(stubText);
@@ -290,7 +291,7 @@ export async function POST(req: Request): Promise<Response> {
                   ],
                   messages: [{ role: 'user', content: enrichPrompt(stub) }],
                 },
-                { signal: reqSignal }
+                { signal: streamAbort.signal }
               );
               const timeoutP = new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error('enrich timeout')), ENRICH_TIMEOUT_MS)
@@ -334,6 +335,10 @@ export async function POST(req: Request): Promise<Response> {
       }
 
       controller.close();
+    },
+    cancel() {
+      // Client disconnected mid-stream — abort all in-flight Anthropic calls immediately
+      streamAbort.abort();
     },
   });
 
