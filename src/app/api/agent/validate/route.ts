@@ -1,10 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createRouteLogger } from '@/lib/route-logger';
+import { withTimeout, AGENT_TIMEOUT_MS } from '@/lib/agent-guard';
 
 const log = createRouteLogger('agent-validate');
 
 export async function POST(request: Request): Promise<Response> {
   const ctx = log.begin();
+  const { signal } = request;
   try {
     const body = (await request.json()) as { thesis?: string };
     const thesis = typeof body?.thesis === 'string' ? body.thesis.trim() : '';
@@ -25,22 +27,28 @@ export async function POST(request: Request): Promise<Response> {
 
     log.info(ctx.reqId, 'Researching proven market', { thesis: thesis.slice(0, 80) });
 
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 512,
-      messages: [
+    const message = await withTimeout(
+      client.messages.create(
         {
-          role: 'user',
-          content: `A solo founder has this market thesis: "${thesis}"
+          model: 'claude-sonnet-4-6',
+          max_tokens: 512,
+          messages: [
+            {
+              role: 'user',
+              content: `A solo founder has this market thesis: "${thesis}"
 
 Name 2-3 real products people currently pay for in the space this thesis describes. Include pricing if you know it.
 
 Output ONLY a comma-separated list. No preamble, no explanation, no bullet points.
 
 Example output: Exploding Topics Pro ($49/mo), Trends.vc ($150/mo), SparkToro ($50/mo)`,
+            },
+          ],
         },
-      ],
-    });
+        { signal }
+      ),
+      AGENT_TIMEOUT_MS
+    );
 
     log.info(ctx.reqId, 'Claude response', {
       stop_reason: message.stop_reason,

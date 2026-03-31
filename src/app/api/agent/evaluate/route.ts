@@ -1,10 +1,14 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { sql } from '@/lib/db';
 import { createRouteLogger } from '@/lib/route-logger';
+import { withTimeout, AGENT_TIMEOUT_MS, WEB_SEARCH_TIMEOUT_MS } from '@/lib/agent-guard';
 
 import { getTodayQuestion } from '@/lib/utils';
 
 const log = createRouteLogger('agent-evaluate');
+
+// Max concurrent Claude calls — prevents N-signal blowout
+const EVAL_CONCURRENCY = 5;
 
 interface SignalRow {
   id: number;
@@ -167,14 +171,17 @@ or
 {"ref":${signal.id},"recommendation":"delete","reasoning":"one sentence"}`;
 
   try {
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 512,
-      tools: signal.content
-        ? []
-        : [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
-      messages: [{ role: 'user', content: prompt }],
-    });
+    const message = await withTimeout(
+      client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 512,
+        tools: signal.content
+          ? []
+          : [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal.content ? AGENT_TIMEOUT_MS : WEB_SEARCH_TIMEOUT_MS
+    );
 
     const lastText = [...message.content].reverse().find((b) => b.type === 'text');
     const rawText = lastText?.type === 'text' ? lastText.text.trim() : '{}';
@@ -280,16 +287,19 @@ export async function POST(req: Request): Promise<Response> {
         // Each signal starts its Claude call the moment its URL fetch resolves —
         // no waiting for all fetches to complete before any Claude call starts.
         const evaluations: EvaluationResult[] = [];
-        await Promise.all(
-          signals.map(async (s) => {
-            const content = await fetchContent(s);
-            const result = await evaluateOne(client, { ...s, content }, question);
-            if (result) {
-              evaluations.push(result);
-              flush({ type: 'result', evaluation: result });
-            }
-          })
-        );
+        for (let i = 0; i < signals.length; i += EVAL_CONCURRENCY) {
+          const batch = signals.slice(i, i + EVAL_CONCURRENCY);
+          await Promise.all(
+            batch.map(async (s) => {
+              const content = await fetchContent(s);
+              const result = await evaluateOne(client, { ...s, content }, question);
+              if (result) {
+                evaluations.push(result);
+                flush({ type: 'result', evaluation: result });
+              }
+            })
+          );
+        }
 
         const observe = evaluations.filter((e) => e.recommendation === 'observe').length;
         const skip = evaluations.filter((e) => e.recommendation === 'skip').length;
@@ -327,12 +337,15 @@ Respond with ONLY valid JSON, no markdown:
 {"priority_ids":[1,3],"priority":"...","patterns":"...","thesis_candidate":"..."}`;
 
           try {
-            const synthMsg = await client.messages.create({
-              model: 'claude-sonnet-4-6',
-              max_tokens: 512,
-              tools: [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
-              messages: [{ role: 'user', content: synthPrompt }],
-            });
+            const synthMsg = await withTimeout(
+              client.messages.create({
+                model: 'claude-sonnet-4-6',
+                max_tokens: 512,
+                tools: [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
+                messages: [{ role: 'user', content: synthPrompt }],
+              }),
+              WEB_SEARCH_TIMEOUT_MS
+            );
             const lastText = [...synthMsg.content].reverse().find((b) => b.type === 'text');
             const rawText = lastText?.type === 'text' ? lastText.text.trim() : '{}';
             const raw = rawText

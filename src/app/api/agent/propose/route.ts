@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { sql } from '@/lib/db';
 import { createRouteLogger } from '@/lib/route-logger';
+import { withTimeout, AGENT_TIMEOUT_MS } from '@/lib/agent-guard';
 
 const log = createRouteLogger('agent-propose');
 
@@ -13,8 +14,8 @@ export interface ProposeResult {
 
 export async function POST(request: Request): Promise<Response> {
   const ctx = log.begin();
+  const { signal } = request;
   try {
-    void request;
 
     // Pull last 30 observations across all dates, newest first
     const rows = (await sql`
@@ -70,11 +71,13 @@ If the observations are too scattered to form a coherent belief, return thesis: 
 Respond with ONLY valid JSON, no markdown:
 {"thesis":"...","supporting_observation_ids":[1,2,3],"conviction_level":2,"reasoning":"..."}`;
 
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 512,
-      messages: [{ role: 'user', content: prompt }],
-    });
+    const message = await withTimeout(
+      client.messages.create(
+        { model: 'claude-sonnet-4-6', max_tokens: 512, messages: [{ role: 'user', content: prompt }] },
+        { signal }
+      ),
+      AGENT_TIMEOUT_MS
+    );
 
     const text = message.content.find((b) => b.type === 'text')?.text.trim() ?? '{}';
     const raw = text

@@ -1,7 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createRouteLogger } from '@/lib/route-logger';
+import { withTimeout, WEB_SEARCH_TIMEOUT_MS } from '@/lib/agent-guard';
 
 const log = createRouteLogger('agent-discover-sources');
+
+// Prevent duplicate expensive web_search calls for the same market
+const inFlightDiscovery = new Set<string>();
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -114,6 +118,23 @@ export async function POST(req: Request): Promise<Response> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const encoder = new TextEncoder();
 
+  // If same market is already being sourced, return immediately to avoid duplicate web_search billing
+  const flightKey = market_name.trim().toLowerCase();
+  if (inFlightDiscovery.has(flightKey)) {
+    log.info(ctx.reqId, 'Skipping duplicate in-flight request', { market_name });
+    const single = new ReadableStream({
+      start(c) {
+        c.enqueue(encoder.encode(JSON.stringify({ type: 'done' }) + '\n'));
+        c.close();
+      },
+    });
+    return log.end(
+      ctx,
+      new Response(single, { headers: { 'Content-Type': 'application/x-ndjson' } }),
+      { market_name, skipped: true }
+    );
+  }
+
   const stream = new ReadableStream({
     async start(controller) {
       function flush(chunk: DiscoverSourcesChunk) {
@@ -124,33 +145,37 @@ export async function POST(req: Request): Promise<Response> {
         }
       }
 
+      inFlightDiscovery.add(flightKey);
       try {
         const hasSubreddits = existing_subreddits && existing_subreddits.length > 0;
         log.info(ctx.reqId, 'Discovering sources', { market_name, hasSubreddits });
 
-        const message = await client.messages.create({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 2048,
-          // When subreddits already known: only need 2-3 searches for G2/Capterra. Otherwise 5.
-          tools: [
-            {
-              name: 'web_search',
-              type: 'web_search_20260209' as const,
-              max_uses: hasSubreddits ? 3 : 5,
-            },
-          ],
-          messages: [
-            {
-              role: 'user',
-              content: buildPrompt(
-                market_name.trim(),
-                micro_niche.trim(),
-                description?.trim(),
-                existing_subreddits
-              ),
-            },
-          ],
-        });
+        const message = await withTimeout(
+          client.messages.create({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 2048,
+            // When subreddits already known: only need 2-3 searches for G2/Capterra. Otherwise 5.
+            tools: [
+              {
+                name: 'web_search',
+                type: 'web_search_20260209' as const,
+                max_uses: hasSubreddits ? 3 : 5,
+              },
+            ],
+            messages: [
+              {
+                role: 'user',
+                content: buildPrompt(
+                  market_name.trim(),
+                  micro_niche.trim(),
+                  description?.trim(),
+                  existing_subreddits
+                ),
+              },
+            ],
+          }),
+          WEB_SEARCH_TIMEOUT_MS
+        );
 
         // Extract text blocks from response (may have tool_use blocks interspersed)
         const textBlocks = message.content.filter((b) => b.type === 'text');
@@ -169,6 +194,8 @@ export async function POST(req: Request): Promise<Response> {
       } catch (error) {
         log.err(ctx, error);
         flush({ type: 'error', message: 'Source discovery failed' });
+      } finally {
+        inFlightDiscovery.delete(flightKey);
       }
 
       controller.close();

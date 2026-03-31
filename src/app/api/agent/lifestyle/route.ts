@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createRouteLogger } from '@/lib/route-logger';
+import { withTimeout, AGENT_TIMEOUT_MS } from '@/lib/agent-guard';
 
 const log = createRouteLogger('agent-lifestyle');
 
@@ -16,6 +17,7 @@ interface LifestyleResult {
 
 export async function POST(request: Request): Promise<Response> {
   const ctx = log.begin();
+  const { signal } = request;
   try {
     const body = (await request.json()) as { thesis?: string; proven_market?: string };
     const thesis = typeof body?.thesis === 'string' ? body.thesis.trim() : '';
@@ -41,13 +43,15 @@ export async function POST(request: Request): Promise<Response> {
 
     log.info(ctx.reqId, 'Assessing lifestyle fit', { thesis: thesis.slice(0, 80) });
 
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      messages: [
+    const message = await withTimeout(
+      client.messages.create(
         {
-          role: 'user',
-          content: `A solo founder's validated market thesis: "${thesis}"
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1024,
+          messages: [
+            {
+              role: 'user',
+              content: `A solo founder's validated market thesis: "${thesis}"
 
 Proven competing products in this space: "${provenMarket}"
 
@@ -74,9 +78,13 @@ Respond ONLY with valid JSON, no explanation, no markdown:
   ],
   "overall_pass": true
 }`,
+            },
+          ],
         },
-      ],
-    });
+        { signal }
+      ),
+      AGENT_TIMEOUT_MS
+    );
 
     log.info(ctx.reqId, 'Claude response', {
       stop_reason: message.stop_reason,

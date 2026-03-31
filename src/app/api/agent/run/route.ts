@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { sql, getActiveMarketId } from '@/lib/db';
 import { createRouteLogger } from '@/lib/route-logger';
+import { withTimeout, AGENT_TIMEOUT_MS } from '@/lib/agent-guard';
 
 import { getTodayQuestion } from '@/lib/utils';
 
@@ -426,11 +427,14 @@ Respond with ONLY valid JSON, no markdown fences, no explanation:
 {"selected":[{"id":"...","source_category":"complaints","note":"..."}]}`;
 
       log.info(ctx.reqId, 'Calling claude-sonnet-4-6', { items: allItems.length });
-      const message = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2048,
-        messages: [{ role: 'user', content: prompt }],
-      });
+      const message = await withTimeout(
+        client.messages.create({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 2048,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+        AGENT_TIMEOUT_MS
+      );
 
       const raw = message.content[0]?.type === 'text' ? message.content[0].text.trim() : '{}';
       let parsed: { selected?: ClaudeSelected[] } = {};
