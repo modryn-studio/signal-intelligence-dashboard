@@ -196,6 +196,91 @@ async function fetchReddit(subreddit: string): Promise<FetchedItem[]> {
   }
 }
 
+async function fetchG2Reviews(productSlug: string): Promise<FetchedItem[]> {
+  try {
+    const res = await fetch(
+      `https://www.g2.com/products/${encodeURIComponent(productSlug)}/reviews?utf8=%E2%9C%93&filters%5Bnps_score%5D=2.0%2C3.0`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; signal-intelligence-dashboard/1.0)',
+          Accept: 'text/html',
+        },
+        cache: 'no-store',
+      }
+    );
+    if (!res.ok) return [];
+    const html = await res.text();
+
+    // Extract review text from G2 review cards — fragile HTML parsing
+    const reviewRegex =
+      /<div[^>]*class="[^"]*pjax-container[^"]*"[^>]*>[\s\S]*?<div[^>]*itemprop="reviewBody"[^>]*>([\s\S]*?)<\/div>/g;
+    const items: FetchedItem[] = [];
+    let match: RegExpExecArray | null;
+    let i = 0;
+    while ((match = reviewRegex.exec(html)) !== null && items.length < 15) {
+      const text = match[1]
+        .replace(/<[^>]*>/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (text.length < 20) continue;
+      items.push({
+        id: `g2_${productSlug}_${i++}`,
+        title: text.slice(0, 200),
+        url: `https://www.g2.com/products/${productSlug}/reviews`,
+        source: 'G2',
+        defaultCategory: 'complaints',
+        score: 0,
+        isCustomSource: true,
+      });
+    }
+    return items;
+  } catch {
+    return [];
+  }
+}
+
+async function fetchCapterraReviews(productSlug: string): Promise<FetchedItem[]> {
+  try {
+    const res = await fetch(
+      `https://www.capterra.com/p/${encodeURIComponent(productSlug)}/reviews/`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; signal-intelligence-dashboard/1.0)',
+          Accept: 'text/html',
+        },
+        cache: 'no-store',
+      }
+    );
+    if (!res.ok) return [];
+    const html = await res.text();
+
+    // Extract review text — fragile HTML parsing
+    const reviewRegex = /<div[^>]*class="[^"]*review-content[^"]*"[^>]*>([\s\S]*?)<\/div>/g;
+    const items: FetchedItem[] = [];
+    let match: RegExpExecArray | null;
+    let i = 0;
+    while ((match = reviewRegex.exec(html)) !== null && items.length < 15) {
+      const text = match[1]
+        .replace(/<[^>]*>/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (text.length < 20) continue;
+      items.push({
+        id: `capterra_${productSlug}_${i++}`,
+        title: text.slice(0, 200),
+        url: `https://www.capterra.com/p/${productSlug}/reviews/`,
+        source: 'Capterra',
+        defaultCategory: 'complaints',
+        score: 0,
+        isCustomSource: true,
+      });
+    }
+    return items;
+  } catch {
+    return [];
+  }
+}
+
 export async function POST(req: Request): Promise<Response> {
   const ctx = log.begin();
   try {
@@ -214,20 +299,35 @@ export async function POST(req: Request): Promise<Response> {
     const marketId = await getActiveMarketId();
     let marketContext = '';
     let customSubreddits: string[] = [];
+    let g2Slugs: { id: number; value: string }[] = [];
+    let capterraSlugs: { id: number; value: string }[] = [];
 
     if (marketId) {
       const [market] = (await sql`
         SELECT name, description FROM markets WHERE id = ${marketId}
       `) as { name: string; description: string | null }[];
       const sourcesRows = (await sql`
-        SELECT value FROM market_sources WHERE market_id = ${marketId} AND source_type = 'subreddit'
-      `) as { value: string }[];
-      customSubreddits = sourcesRows.map((r) => r.value);
+        SELECT id, source_type, value FROM market_sources WHERE market_id = ${marketId} AND enabled = true
+      `) as { id: number; source_type: string; value: string }[];
+      customSubreddits = sourcesRows
+        .filter((r) => r.source_type === 'subreddit')
+        .map((r) => r.value);
+      g2Slugs = sourcesRows
+        .filter((r) => r.source_type === 'g2_product')
+        .map((r) => ({ id: r.id, value: r.value }));
+      capterraSlugs = sourcesRows
+        .filter((r) => r.source_type === 'capterra_product')
+        .map((r) => ({ id: r.id, value: r.value }));
       if (market) {
         marketContext = `The builder is researching the **${market.name}** market.${
           market.description ? ` ${market.description}` : ''
         } Select only signals directly relevant to this market — discard anything that doesn't fit.\n\n`;
-        log.info(ctx.reqId, 'Market context', { market: market.name, customSubreddits });
+        log.info(ctx.reqId, 'Market context', {
+          market: market.name,
+          customSubreddits,
+          g2: g2Slugs.length,
+          capterra: capterraSlugs.length,
+        });
       }
     }
 
@@ -244,6 +344,37 @@ export async function POST(req: Request): Promise<Response> {
       .flat()
       .map((item) => ({ ...item, isCustomSource: true }));
 
+    // G2/Capterra review fetches — fragile, non-fatal
+    const g2Results = await Promise.all(g2Slugs.map((s) => fetchG2Reviews(s.value)));
+    const g2Items: FetchedItem[] = g2Results.flat();
+    const capterraResults = await Promise.all(
+      capterraSlugs.map((s) => fetchCapterraReviews(s.value))
+    );
+    const capterraItems: FetchedItem[] = capterraResults.flat();
+
+    // Update last_pull_at for sources that returned data
+    if (marketId) {
+      const sourceIdsToUpdate: number[] = [];
+      // Subreddit sources that fetched successfully
+      const subredditRows = (await sql`
+        SELECT id, value FROM market_sources WHERE market_id = ${marketId} AND source_type = 'subreddit' AND enabled = true
+      `) as { id: number; value: string }[];
+      for (const row of subredditRows) {
+        const result = customRedditResults[customSubreddits.indexOf(row.value)];
+        if (result && result.length > 0) sourceIdsToUpdate.push(row.id);
+      }
+      for (let i = 0; i < g2Slugs.length; i++) {
+        if (g2Results[i] && g2Results[i].length > 0) sourceIdsToUpdate.push(g2Slugs[i].id);
+      }
+      for (let i = 0; i < capterraSlugs.length; i++) {
+        if (capterraResults[i] && capterraResults[i].length > 0)
+          sourceIdsToUpdate.push(capterraSlugs[i].id);
+      }
+      if (sourceIdsToUpdate.length > 0) {
+        await sql`UPDATE market_sources SET last_pull_at = NOW() WHERE id = ANY(${sourceIdsToUpdate})`;
+      }
+    }
+
     const allItems: FetchedItem[] = [
       ...hn,
       ...redditSaas,
@@ -251,6 +382,8 @@ export async function POST(req: Request): Promise<Response> {
       ...productHunt,
       ...indieHackers,
       ...customItems,
+      ...g2Items,
+      ...capterraItems,
     ];
     log.info(ctx.reqId, 'Fetched', {
       hn: hn.length,
@@ -259,6 +392,8 @@ export async function POST(req: Request): Promise<Response> {
       productHunt: productHunt.length,
       indieHackers: indieHackers.length,
       custom: customItems.length,
+      g2: g2Items.length,
+      capterra: capterraItems.length,
       total: allItems.length,
     });
 

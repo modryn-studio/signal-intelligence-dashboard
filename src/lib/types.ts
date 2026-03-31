@@ -47,11 +47,19 @@ export interface Market {
   signal_count?: number;
 }
 
+export type SourceType = 'subreddit' | 'g2_product' | 'capterra_product' | 'custom_url';
+export type SourceStatus = 'live' | 'fragile' | 'needs_api_key' | 'inactive';
+
 export interface MarketSource {
   id: number;
   market_id: number;
-  source_type: 'subreddit' | 'community';
+  source_type: SourceType;
   value: string;
+  display_name: string | null;
+  description: string | null;
+  status: SourceStatus;
+  enabled: boolean;
+  last_pull_at: string | null;
   created_at: string;
 }
 

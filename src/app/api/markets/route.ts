@@ -26,6 +26,19 @@ void sql`
   )
 `.catch(() => {});
 
+// Self-migrate: new columns for source discovery
+void sql`ALTER TABLE market_sources ADD COLUMN IF NOT EXISTS display_name TEXT`.catch(() => {});
+void sql`ALTER TABLE market_sources ADD COLUMN IF NOT EXISTS description TEXT`.catch(() => {});
+void sql`ALTER TABLE market_sources ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'live'`.catch(
+  () => {}
+);
+void sql`ALTER TABLE market_sources ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT true`.catch(
+  () => {}
+);
+void sql`ALTER TABLE market_sources ADD COLUMN IF NOT EXISTS last_pull_at TIMESTAMPTZ`.catch(
+  () => {}
+);
+
 void sql`ALTER TABLE signal_inputs ADD COLUMN IF NOT EXISTS market_id INT REFERENCES markets(id)`.catch(
   () => {}
 );
@@ -74,7 +87,13 @@ export async function POST(request: NextRequest): Promise<Response> {
     const body = (await request.json()) as {
       name?: string;
       description?: string;
-      sources?: { source_type?: string; value: string }[];
+      sources?: {
+        source_type?: string;
+        value: string;
+        display_name?: string;
+        description?: string;
+        status?: string;
+      }[];
     };
     const { name, description, sources } = body;
 
@@ -98,8 +117,15 @@ export async function POST(request: NextRequest): Promise<Response> {
       for (const src of sources) {
         if (src.value?.trim()) {
           await sql`
-            INSERT INTO market_sources (market_id, source_type, value)
-            VALUES (${marketId}, ${src.source_type || 'subreddit'}, ${src.value.trim()})
+            INSERT INTO market_sources (market_id, source_type, value, display_name, description, status)
+            VALUES (
+              ${marketId},
+              ${src.source_type || 'subreddit'},
+              ${src.value.trim()},
+              ${src.display_name?.trim() || null},
+              ${src.description?.trim() || null},
+              ${src.status || 'live'}
+            )
           `;
         }
       }
@@ -125,10 +151,27 @@ export async function PATCH(request: NextRequest): Promise<Response> {
       name?: string;
       description?: string;
       is_active?: boolean;
-      addSource?: { source_type?: string; value: string };
+      addSource?: {
+        source_type?: string;
+        value: string;
+        display_name?: string;
+        description?: string;
+        status?: string;
+      };
       removeSourceId?: number;
+      toggleSourceId?: number;
+      toggleSourceEnabled?: boolean;
     };
-    const { id, name, description, is_active, addSource, removeSourceId } = body;
+    const {
+      id,
+      name,
+      description,
+      is_active,
+      addSource,
+      removeSourceId,
+      toggleSourceId,
+      toggleSourceEnabled,
+    } = body;
 
     if (!id) return Response.json({ error: 'id is required' }, { status: 400 });
 
@@ -152,13 +195,24 @@ export async function PATCH(request: NextRequest): Promise<Response> {
 
     if (addSource?.value?.trim()) {
       await sql`
-        INSERT INTO market_sources (market_id, source_type, value)
-        VALUES (${id}, ${addSource.source_type || 'subreddit'}, ${addSource.value.trim()})
+        INSERT INTO market_sources (market_id, source_type, value, display_name, description, status)
+        VALUES (
+          ${id},
+          ${addSource.source_type || 'subreddit'},
+          ${addSource.value.trim()},
+          ${addSource.display_name?.trim() || null},
+          ${addSource.description?.trim() || null},
+          ${addSource.status || 'live'}
+        )
       `;
     }
 
     if (removeSourceId) {
       await sql`DELETE FROM market_sources WHERE id = ${removeSourceId} AND market_id = ${id}`;
+    }
+
+    if (toggleSourceId !== undefined && toggleSourceEnabled !== undefined) {
+      await sql`UPDATE market_sources SET enabled = ${toggleSourceEnabled} WHERE id = ${toggleSourceId} AND market_id = ${id}`;
     }
 
     const [market] = await sql`SELECT * FROM markets WHERE id = ${id}`;
