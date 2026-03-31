@@ -347,7 +347,9 @@ Respond with ONLY valid JSON, no markdown:
                 {
                   model: 'claude-sonnet-4-6',
                   max_tokens: 512,
-                  tools: [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
+                  tools: [
+                    { name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 },
+                  ],
                   messages: [{ role: 'user', content: synthPrompt }],
                 },
                 { signal: reqSignal }

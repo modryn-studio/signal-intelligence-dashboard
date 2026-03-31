@@ -132,7 +132,7 @@ export function ValidateThesisModal({ open, onClose, truths, onSaved }: Props) {
     setProvenMarket('');
     setResearchLoading(true);
     setEditingMarket(false);
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open]);  
 
   // Research (or restore cache) when open or thesis index changes
   useEffect(() => {

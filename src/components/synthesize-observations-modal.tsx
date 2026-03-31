@@ -137,7 +137,7 @@ export function SynthesizeObservationsModal({ open, onClose, onThesisCreated }: 
     if (!open) return;
     runPropose();
     return () => abortRef.current?.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [open]);
 
   const handleCreate = async () => {

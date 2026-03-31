@@ -362,6 +362,8 @@ export function OnboardContent() {
       abortRef.current?.abort();
     };
   }, []);
+
+  function toggleTag(tag: string) {
     setSelectedTags((prev) => {
       if (prev.includes(tag)) return prev.filter((t) => t !== tag);
       if (prev.length >= 3) return prev; // max 3

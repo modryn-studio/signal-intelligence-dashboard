@@ -145,7 +145,7 @@ export function LifestyleFilterModal({ open, onClose, truths, onSaved }: Props) 
     setResult(null);
     setLoading(true);
     setError('');
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open]);  
 
   // Run (or restore cache) when open or thesis index changes
   useEffect(() => {

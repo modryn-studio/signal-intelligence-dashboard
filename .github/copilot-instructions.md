@@ -46,7 +46,8 @@ basePath: (empty — standalone deployment)
   /api/agent/propose    → Synthesize observations → proposed thesis
   /api/agent/validate   → Research proven market for a thesis
   /api/agent/lifestyle  → 5-filter solo lifestyle assessment
-  /api/agent/excavate   → Onboarding — generate 4 market options from tags/description
+  /api/agent/excavate         → Onboarding — generate 4 market options from tags/description
+  /api/agent/discover-sources → Find subreddits + product pages for a market (streaming NDJSON)
 /components             → Dashboard panels, modals, and shadcn/ui primitives
 /lib                    → db.ts (Neon), types.ts, route-logger.ts, analytics.ts, utils.ts
 /hooks                  → use-mobile.ts, use-toast.ts
@@ -56,8 +57,8 @@ schema.sql              → one-time Neon DB bootstrap (already run)
 
 ## Route Map
 
-- `/` → Market gate — checks `skipMarketOnboard` localStorage; 0 markets → `/onboard`, 1 market → `/market/[id]`, 2+ → MarketPicker sorted by signal count
-- `/onboard` → Excavation onboarding — Screen 1: 12 interest tags (max 3) + freetext → ExcavateLoading (~80s) → Screen 2: 4 market cards with demand badges; inline steer refinement; selecting a card creates market + fires agent silently → `/market/[id]`
+- `/` → Market gate — fetches `/api/markets?all=1`; 0 markets → `/onboard`, 1 market → `/market/[id]`, 2+ → inline `<MarketPicker>` sorted by signal count; no localStorage flags
+- `/onboard` → Excavation onboarding — Screen 1: 12 interest tags (max 3) + freetext → ExcavateLoading (~15s stub, 30s ease-out progress bar) → Screen 2: 4 market cards with demand badges + inline steer refinement → Screen 3: signal sources review (discover-sources streaming) → selecting sources creates market + fires agent silently → `/market/[id]`
 - `/market/[id]` → Per-market dashboard — PATCHes market active on mount (atomic SQL); renders `<DashboardHeader marketId={id}>` immediately, gates `<DashboardLayout>` behind PATCH completion
 - `/api/markets` → CRUD markets + market_sources; self-migrates tables at cold-start; PATCH activation is atomic single-statement (`is_active = (id = $id)`)
 - `/api/inputs` → CRUD for signal inputs — market-scoped via `getActiveMarketId()`
@@ -67,7 +68,8 @@ schema.sql              → one-time Neon DB bootstrap (already run)
 - `/api/digest` → POST `{ email }` — generates HTML digest scoped to active market; inserts to `email_digests`; requires Resend/SMTP env vars for actual delivery
 - `/api/feedback` → POST — feedback + newsletter signup
 - `/api/agent/run` → POST `{ today }` — market-aware: injects market name+description as focus filter; fetches HN, PH, Indie Hackers, r/SaaS, r/Entrepreneur + custom subreddits; Claude selects ~10 relevant; stamps `market_id`
-- `/api/agent/evaluate` → POST — streaming NDJSON; fetches real source content; Claude with `web_search_20260209` (max 3) returns observe/skip/delete per signal + Synthesis block; cached in localStorage by date
+- `/api/agent/evaluate` → POST — streaming NDJSON; evaluates in batches of 5; fetches real source content (Reddit JSON, HN Algolia, article HTML); web_search conditional — skipped when content fetched (60s timeout), used as fallback (max 1 use, 45s) only when content empty; synthesis call has web_search available (max 1 use); cached in localStorage by date
+- `/api/agent/discover-sources` → POST `{ market_name, micro_niche, description?, existing_subreddits? }` — streaming NDJSON; Claude with web_search (3–5 uses); returns subreddits + G2/Capterra pages; in-flight dedup per market_name
 - `/api/agent/propose` → POST — reads last 30 observations; Claude returns `{ thesis, supporting_observations, conviction_level, reasoning }`; cached by date
 - `/api/agent/validate` → POST `{ thesis }` — Claude (no web search) returns `{ proposed_proven_market }`; cached by thesis ID + date
 - `/api/agent/lifestyle` → POST `{ thesis, proven_market }` — Claude scores 5 filters; Q2 (recurring revenue) is knockout; returns `{ questions, overall_pass }`; cached by thesis ID + date
