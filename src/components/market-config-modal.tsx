@@ -15,6 +15,7 @@ interface Props {
   market: Market;
   sources: MarketSource[];
   onUpdated: () => void;
+  onDeleted?: () => void;
 }
 
 export function MarketConfigModal({
@@ -23,6 +24,7 @@ export function MarketConfigModal({
   market,
   sources: initialSources,
   onUpdated,
+  onDeleted,
 }: Props) {
   const router = useRouter();
   const [name, setName] = useState(market.name);
@@ -30,6 +32,8 @@ export function MarketConfigModal({
   const [sources, setSources] = useState<MarketSource[]>(initialSources);
   const [newSourceVal, setNewSourceVal] = useState('');
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
 
   // Sync when market prop changes
@@ -150,28 +154,47 @@ export function MarketConfigModal({
         {error && <p className="text-destructive mt-3 text-xs">{error}</p>}
 
         <div className="mt-6 flex items-center justify-between gap-2">
-          <div className="flex gap-3">
+          {/* Delete — confirm inline */}
+          {confirmDelete ? (
+            <div className="flex items-center gap-3">
+              <span className="text-muted-foreground text-xs">Delete this market?</span>
+              <button
+                type="button"
+                onClick={async () => {
+                  setDeleting(true);
+                  try {
+                    const res = await fetch(`/api/markets?id=${market.id}`, { method: 'DELETE' });
+                    if (!res.ok) throw new Error();
+                    onDeleted ? onDeleted() : router.push('/');
+                    onClose();
+                  } catch {
+                    setError('Failed to delete. Try again.');
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                className="text-destructive font-mono text-xs hover:underline"
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting…' : 'Yes, delete'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                className="text-muted-foreground font-mono text-xs hover:underline"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
-              onClick={() => {
-                onClose();
-                router.push('/');
-              }}
-              className="text-muted-foreground/60 hover:text-muted-foreground text-xs transition-colors"
+              onClick={() => setConfirmDelete(true)}
+              className="text-muted-foreground/40 hover:text-destructive font-mono text-xs transition-colors"
             >
-              All markets →
+              Delete market
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                router.push('/onboard');
-              }}
-              className="text-muted-foreground/60 hover:text-muted-foreground text-xs transition-colors"
-            >
-              + New market
-            </button>
-          </div>
+          )}
           <Button
             type="button"
             onClick={handleSave}

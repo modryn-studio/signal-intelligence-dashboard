@@ -2,8 +2,16 @@
 
 import useSWR from 'swr';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, ChevronDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { DigestModal } from '@/components/digest-modal';
 import { MarketConfigModal } from '@/components/market-config-modal';
 import type { Market, MarketSource } from '@/lib/types';
@@ -51,14 +59,29 @@ function StreakDots({ streak }: { streak: { date: string; count: number }[] }) {
   );
 }
 
-export function DashboardHeader() {
-  const { data: stats } = useSWR<Stats>(`/api/stats?today=${localDateStr()}`, fetcher, {
+export function DashboardHeader({ marketId }: { marketId?: number } = {}) {
+  const router = useRouter();
+  const statsKey = `/api/stats?today=${localDateStr()}${marketId ? `&marketId=${marketId}` : ''}`;
+  const { data: stats } = useSWR<Stats>(statsKey, fetcher, {
     refreshInterval: 60000,
   });
   const { data: marketData, mutate: mutateMarket } = useSWR<{
     market: Market;
     sources: MarketSource[];
   } | null>('/api/markets', fetcher, { refreshInterval: 0 });
+  const { data: allMarkets, mutate: mutateAllMarkets } = useSWR<Market[]>(
+    '/api/markets?all=1',
+    fetcher,
+    { refreshInterval: 0 }
+  );
+
+  // Prefer marketId prop (known from URL) over is_active flag — avoids stale-cache mismatch
+  // when the header renders before the PATCH activating the new market has landed.
+  const activeMarket =
+    (marketId ? allMarkets?.find((m) => m.id === marketId) : null) ??
+    allMarkets?.find((m) => m.is_active) ??
+    marketData?.market ??
+    null;
   const [digestOpen, setDigestOpen] = useState(false);
   const [marketConfigOpen, setMarketConfigOpen] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
@@ -86,18 +109,62 @@ export function DashboardHeader() {
               <p className="text-foreground dark:text-primary font-serif text-base leading-tight text-balance italic md:text-xl lg:text-2xl">
                 &ldquo;{question}&rdquo;
               </p>
-              <p className="text-muted-foreground/70 dark:text-muted-foreground/85 mt-1 font-mono text-[10px] tracking-wider">
-                — {dateStr}
-              </p>
-              {marketData?.market && (
-                <button
-                  type="button"
-                  onClick={() => setMarketConfigOpen(true)}
-                  className="text-primary mt-1 font-mono text-[10px] tracking-widest uppercase transition-opacity hover:opacity-70"
-                >
-                  {marketData.market.name}
-                </button>
-              )}
+              <div className="mt-1 flex items-center gap-2">
+                <p className="text-muted-foreground/70 dark:text-muted-foreground/85 font-mono text-[10px] tracking-wider">
+                  — {dateStr}
+                </p>
+                {activeMarket && (
+                  <>
+                    <span className="text-muted-foreground/40 font-mono text-[10px]">·</span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-primary flex items-center gap-1 font-mono text-[10px] tracking-widest uppercase transition-opacity hover:opacity-70"
+                        >
+                          {activeMarket.name}
+                          <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-52">
+                        {(allMarkets ?? [])
+                          .filter((m) => m.id !== activeMarket.id)
+                          .map((m) => (
+                            <DropdownMenuItem
+                              key={m.id}
+                              onClick={() => router.push(`/market/${m.id}`)}
+                              className="font-mono text-xs"
+                            >
+                              {m.name}
+                            </DropdownMenuItem>
+                          ))}
+                        {(allMarkets ?? []).filter((m) => m.id !== activeMarket.id).length > 0 && (
+                          <DropdownMenuSeparator />
+                        )}
+                        <DropdownMenuItem
+                          onClick={() => setMarketConfigOpen(true)}
+                          className="font-mono text-xs"
+                        >
+                          Edit sources &amp; name
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => router.push('/')}
+                          className="font-mono text-xs"
+                        >
+                          All markets
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => router.push('/onboard')}
+                          className="font-mono text-xs"
+                        >
+                          + New market
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -163,14 +230,15 @@ export function DashboardHeader() {
       </header>
 
       <DigestModal open={digestOpen} onClose={() => setDigestOpen(false)} />
-      {marketData?.market && (
+      {activeMarket && (
         <MarketConfigModal
           open={marketConfigOpen}
           onClose={() => setMarketConfigOpen(false)}
-          market={marketData.market}
-          sources={marketData.sources ?? []}
+          market={marketData?.market ?? activeMarket}
+          sources={marketData?.sources ?? []}
           onUpdated={() => {
             void mutateMarket();
+            void mutateAllMarkets();
           }}
         />
       )}

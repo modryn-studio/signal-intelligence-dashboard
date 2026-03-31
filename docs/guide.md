@@ -28,15 +28,28 @@ At the top of the page there is a question in italics. That is your focus for to
 
 When you first open the app, you land on the onboarding screen.
 
-Write in the text field in your own words. Describe a space you work in, know well, or keep getting frustrated by. An industry, a job role, a tool you hate, a problem that keeps coming back. One paragraph or a few sentences is enough.
+**Screen 1 — What are you into?**
 
-Click **Find my market →**.
+You will see a grid of 12 interest tags: freelance, dev tools, finance, e-commerce, fitness, real estate, creators, healthcare, legal, logistics, education, restaurants. Pick up to 3. Or skip the tags entirely and type a description in the field below the grid. You need at least one tag or some text to continue.
 
-The agent reads what you wrote, searches for real communities where people in that space talk, and suggests a market name, a short description, and some subreddits to watch.
+Click **Find my markets →**.
 
-Review it. Edit the name if it's off. Toggle the sources you want. Click **Start observing →**.
+You will see a full-screen loading state: "Finding your markets — Searching the web for real demand data. Takes about a minute." This step takes around 60 seconds. The agent is searching for real demand signals for each possible market.
 
-You land on your market dashboard. The agent starts fetching your first batch of signals automatically.
+**Screen 2 — Pick the one that fits.**
+
+Four market cards appear. Each shows:
+
+- A breadcrumb showing the broader market → niche
+- A bold micro-niche description — the exact person and problem
+- A price range (what people in this space pay)
+- A demand badge: **proven demand**, **growing**, or **crowded**
+
+Click the card that fits best. You can change it later.
+
+If none fit: click **None of these feel right — let me refine ›** below the cards. A set of steer tags appears (more technical, more niche, different industry, I use this daily, show me boring markets, B2B focus, more underserved). Select any that apply, then click **Regenerate →**.
+
+After you pick a card, the app creates your market workspace and starts fetching your first batch of signals in the background. You are dropped straight into your market dashboard.
 
 ---
 
@@ -46,13 +59,13 @@ You have two ways to do this.
 
 ### Option A — Run the agent (fastest)
 
-Click **Agent** in the top-right of the left column. Click **Run Agent**.
+Click **Agent ⌄** in the top-right of the left column. Click **Run Agent**.
 
 A progress window opens. Wait 15–30 seconds.
 
 What it does: it reads recent posts from Hacker News, Product Hunt, Indie Hackers, r/SaaS, r/Entrepreneur, and any custom subreddits you added to your market. It keeps only the ones that match today's question and your market focus. Everything else is thrown away.
 
-When it finishes, click **Deep Evaluate** to move to the next step.
+When it finishes, click **→ Deep evaluate** to move straight to evaluation. Or close the window and click **Agent ⌄ → Evaluate** from the left column header.
 
 ### Option B — Add signals yourself
 
@@ -74,7 +87,7 @@ Aim for 5–12 signals per session.
 
 ## Step 3 — Evaluate the signals
 
-Click **Agent** then **Deep Evaluate** in the left column header. Or click **Deep Evaluate** at the end of the Run Agent screen.
+Click **Agent ⌄** then **Evaluate** in the left column header. Or click **→ Deep evaluate** at the end of the Run Agent screen.
 
 A window opens. Cards stream in one by one. Each card shows a verdict:
 
@@ -210,13 +223,35 @@ You do not have to use the automation. You can connect things by hand at any tim
 
 ## Managing your markets
 
-Click the **orange market name** in the dashboard header to open the market settings.
+In the dashboard header, look for the orange market name displayed next to the date (e.g. `— Tuesday, March 31 · AI DEV TOOLS ⌄`). Click it to open a dropdown.
 
-From there you can:
+From the dropdown:
 
-- Edit the market name and description
-- Add or remove custom subreddits (the agent will fetch these automatically when you Run Agent)
-- Navigate to **All markets** if you have more than one
-- Create a **+ New market** workspace
+- Click any other market name to switch to it
+- Click **Edit sources & name** to open market settings — rename the market, update the description, add or remove custom subreddits
+- Click **All markets** to return to the market picker at `/`
+- Click **+ New market** to start the onboarding flow for a new workspace
 
 Each market is a separate workspace. Signals, observations, and theses in one market do not appear in another.
+
+---
+
+## Status
+
+| Feature                          | Status | Notes                                                                                                                |
+| -------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------- |
+| Market onboarding (excavation)   | ✅     | Interest tags → Claude web search → 4 market cards                                                                   |
+| Run Agent (signal fetch)         | ✅     | HN, PH, Indie Hackers, r/SaaS, r/Entrepreneur + custom subreddits                                                    |
+| Manual signal logging            | ✅     | + Log Input form                                                                                                     |
+| Deep evaluate (streaming)        | ✅     | observe/skip/delete verdicts + synthesis block                                                                       |
+| Add observation manually         | ✅     | Hover card → Observe, or + Capture                                                                                   |
+| Synthesize observations → thesis | ✅     | Requires ≥3 observations; cached per day                                                                             |
+| Validate thesis (proven market)  | ✅     | Claude auto-researches; editable; cached per thesis                                                                  |
+| Lifestyle filter (agentic)       | ✅     | 5 filters; Q2 knockout; cached per thesis                                                                            |
+| Lifestyle filter (manual)        | ✅     | 5 checkboxes inline on validated thesis card                                                                         |
+| Ready to Build card              | ✅     | Shown when validated + lifestyle_pass = true                                                                         |
+| Multi-market switching           | ✅     | Header dropdown; each is a separate workspace                                                                        |
+| Stats (today / total / streak)   | ✅     | Scoped per market; shown in header                                                                                   |
+| Digest button                    | ⏳     | Button is disabled in the header; modal and API are wired but require Resend/SMTP env vars for actual email delivery |
+| Email signup                     | ✅     | Sends to /api/feedback; no confirmation email                                                                        |
+| Mobile bottom tab nav            | ✅     | Signals / Observe / Theses tabs                                                                                      |

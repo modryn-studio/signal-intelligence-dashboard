@@ -2,7 +2,7 @@
 
 ## Who I Am
 
-Luke Hanner is a solo developer shipping AI-assisted tools for indie founders. Signal Intelligence is a personal daily dashboard for observing market signals, capturing insights, and forming contrarian theses over time. Built for solo developers who already know how to build — but are still figuring out what to build. The dashboard aggregates signal sources, prompts a single focusing question each day, and lets patterns surface through an observation log and contrarian truths tracker. Weekly email digest output.
+Luke Hanner is a solo developer shipping AI-assisted tools for indie founders. Signal Intelligence is a personal daily intelligence system organized around markets. Each market is a separate workspace — every signal, observation, and thesis scoped to it. New users go through an excavation onboarding (interest tags → Claude web search → 4 market options) to discover which market fits them. Once inside, a 7-step pipeline moves them from market definition → signal gathering → observations → contrarian theses → validation (proven market research) → lifestyle filter (5-criteria solo viability check) → Ready to Build. Built for solo developers who already know how to build — but are still figuring out what to build.
 
 ## Deployment
 
@@ -31,7 +31,22 @@ basePath: (empty — standalone deployment)
 ## Project Structure
 
 ```
-/app                    → Next.js App Router pages + 7 API routes
+/app                    → Next.js App Router pages + API routes
+  /onboard              → Excavation onboarding (2-screen: tags → market picking)
+  /market/[id]          → Per-market dashboard — activates market on mount
+  /api/markets          → CRUD markets + market_sources; self-migrates tables
+  /api/inputs           → Signal inputs CRUD — market-scoped
+  /api/observations     → Observations CRUD — market-scoped
+  /api/truths           → Contrarian truths CRUD — market-scoped
+  /api/stats            → Aggregate stats (?marketId param)
+  /api/digest           → Digest generation (preview + optional email delivery)
+  /api/feedback         → Feedback + newsletter signup
+  /api/agent/run        → Fetch + filter signals via Claude — market-aware
+  /api/agent/evaluate   → Deep evaluate signals (streaming NDJSON)
+  /api/agent/propose    → Synthesize observations → proposed thesis
+  /api/agent/validate   → Research proven market for a thesis
+  /api/agent/lifestyle  → 5-filter solo lifestyle assessment
+  /api/agent/excavate   → Onboarding — generate 4 market options from tags/description
 /components             → Dashboard panels, modals, and shadcn/ui primitives
 /lib                    → db.ts (Neon), types.ts, route-logger.ts, analytics.ts, utils.ts
 /hooks                  → use-mobile.ts, use-toast.ts
@@ -41,17 +56,22 @@ schema.sql              → one-time Neon DB bootstrap (already run)
 
 ## Route Map
 
-- `/` → Main dashboard — 3-column layout: signal feed, observations, contrarian truths
-- `/api/inputs` → CRUD for signal inputs (URLs, articles, snippets)
-- `/api/observations` → CRUD for observations with tags; stores `related_input_ids INT[]` linking back to signal inputs
-- `/api/truths` → CRUD for contrarian truths — thesis, conviction level (1–5), status lifecycle (forming → confident → validated → invalidated), `supporting_observations INT[]`, `proven_market TEXT`
-- `/api/stats` → Aggregate stats for dashboard header streak display
-- `/api/digest` → Weekly digest generation — email-ready summary
-- `/api/feedback` → Feedback submissions + newsletter signup
-- `/api/agent/run` → POST — fetches HN, Product Hunt, Indie Hackers, r/SaaS, r/Entrepreneur; filters via Claude; inserts to signal_inputs tagged `agent`
-- `/api/agent/evaluate` → POST — fetches real source content (Reddit JSON, HN Algolia, article HTML), calls Claude (`claude-sonnet-4-6`) with `web_search_20260209` tool (max 3 uses), returns `EvaluationResult[]` + `Synthesis`; results cached in localStorage by date
-- `/api/agent/propose` → POST — reads last 30 observations (all dates), calls Claude once, returns `{ thesis, supporting_observations, conviction_level, reasoning }` — powers the Synthesize button in observations panel
-- `/api/agent/validate` → POST — reads a thesis string, calls Claude (no web search, fast), returns `{ proposed_proven_market }` — powers Level 1 competitor research in ValidateThesisModal; results cached in localStorage by thesis ID + date
+- `/` → Market gate — checks `skipMarketOnboard` localStorage; 0 markets → `/onboard`, 1 market → `/market/[id]`, 2+ → MarketPicker sorted by signal count
+- `/onboard` → Excavation onboarding — Screen 1: 12 interest tags (max 3) + freetext → ExcavateLoading (~80s) → Screen 2: 4 market cards with demand badges; inline steer refinement; selecting a card creates market + fires agent silently → `/market/[id]`
+- `/market/[id]` → Per-market dashboard — PATCHes market active on mount (atomic SQL); renders `<DashboardHeader marketId={id}>` immediately, gates `<DashboardLayout>` behind PATCH completion
+- `/api/markets` → CRUD markets + market_sources; self-migrates tables at cold-start; PATCH activation is atomic single-statement (`is_active = (id = $id)`)
+- `/api/inputs` → CRUD for signal inputs — market-scoped via `getActiveMarketId()`
+- `/api/observations` → CRUD for observations — market-scoped; stores `related_input_ids INT[]`
+- `/api/truths` → CRUD for contrarian truths — market-scoped; status lifecycle: `forming → validated → invalidated`; `proven_market TEXT`, `lifestyle_pass BOOLEAN`, `lifestyle_results JSONB`
+- `/api/stats?today={date}&marketId={id}` → Aggregate stats — prefers `marketId` param over `is_active` lookup to avoid stale cache on market navigation
+- `/api/digest` → POST `{ email }` — generates HTML digest scoped to active market; inserts to `email_digests`; requires Resend/SMTP env vars for actual delivery
+- `/api/feedback` → POST — feedback + newsletter signup
+- `/api/agent/run` → POST `{ today }` — market-aware: injects market name+description as focus filter; fetches HN, PH, Indie Hackers, r/SaaS, r/Entrepreneur + custom subreddits; Claude selects ~10 relevant; stamps `market_id`
+- `/api/agent/evaluate` → POST — streaming NDJSON; fetches real source content; Claude with `web_search_20260209` (max 3) returns observe/skip/delete per signal + Synthesis block; cached in localStorage by date
+- `/api/agent/propose` → POST — reads last 30 observations; Claude returns `{ thesis, supporting_observations, conviction_level, reasoning }`; cached by date
+- `/api/agent/validate` → POST `{ thesis }` — Claude (no web search) returns `{ proposed_proven_market }`; cached by thesis ID + date
+- `/api/agent/lifestyle` → POST `{ thesis, proven_market }` — Claude scores 5 filters; Q2 (recurring revenue) is knockout; returns `{ questions, overall_pass }`; cached by thesis ID + date
+- `/api/agent/excavate` → POST `{ tags, description?, steer? }` — Claude with `web_search_20260209` returns 4 market options with demand badge, price range, sources
 
 ## Brand & Voice
 

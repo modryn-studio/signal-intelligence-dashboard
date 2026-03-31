@@ -135,8 +135,8 @@ export async function PATCH(request: NextRequest): Promise<Response> {
     log.info(ctx.reqId, 'Patching market', { id });
 
     if (is_active === true) {
-      await sql`UPDATE markets SET is_active = false, updated_at = NOW()`;
-      await sql`UPDATE markets SET is_active = true, updated_at = NOW() WHERE id = ${id}`;
+      // Single statement — no window where all markets are inactive
+      await sql`UPDATE markets SET is_active = (id = ${id}), updated_at = NOW() WHERE id = ${id} OR is_active = true`;
     }
 
     if (name !== undefined || description !== undefined) {
@@ -178,10 +178,13 @@ export async function DELETE(request: NextRequest): Promise<Response> {
   const id = searchParams.get('id');
 
   if (!id) return Response.json({ error: 'id is required' }, { status: 400 });
+  const numId = Number(id);
+  if (!Number.isFinite(numId))
+    return Response.json({ error: 'id must be numeric' }, { status: 400 });
 
   try {
     // ON DELETE CASCADE handles market_sources rows
-    await sql`DELETE FROM markets WHERE id = ${parseInt(id)}`;
+    await sql`DELETE FROM markets WHERE id = ${numId}`;
     return log.end(ctx, Response.json({ success: true }), { id });
   } catch (error) {
     log.err(ctx, error);

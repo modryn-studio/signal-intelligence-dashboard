@@ -292,8 +292,14 @@ Respond with ONLY valid JSON, no markdown fences, no explanation:
         messages: [{ role: 'user', content: prompt }],
       });
 
-      const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : '{}';
-      const parsed = JSON.parse(raw) as { selected: ClaudeSelected[] };
+      const raw = message.content[0]?.type === 'text' ? message.content[0].text.trim() : '{}';
+      let parsed: { selected?: ClaudeSelected[] } = {};
+      try {
+        parsed = JSON.parse(raw) as { selected: ClaudeSelected[] };
+      } catch {
+        log.warn(ctx.reqId, 'Claude returned non-JSON — treating as empty selection');
+        parsed = { selected: [] };
+      }
       selected = parsed.selected || [];
       log.info(ctx.reqId, 'Claude selected', { count: selected.length });
     } else {

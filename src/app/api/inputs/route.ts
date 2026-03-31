@@ -59,9 +59,12 @@ export async function DELETE(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+  const numId = Number(id);
+  if (!Number.isFinite(numId))
+    return NextResponse.json({ error: 'id must be numeric' }, { status: 400 });
 
   try {
-    await sql`DELETE FROM signal_inputs WHERE id = ${parseInt(id)}`;
+    await sql`DELETE FROM signal_inputs WHERE id = ${numId}`;
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[signal-inputs] DELETE error:', error);

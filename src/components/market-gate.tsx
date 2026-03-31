@@ -9,6 +9,8 @@ import type { Market } from '@/lib/types';
 
 function MarketPicker({ markets }: { markets: Market[] }) {
   const router = useRouter();
+  // Most active market first
+  const sorted = [...markets].sort((a, b) => (b.signal_count ?? 0) - (a.signal_count ?? 0));
   return (
     <div className="bg-background text-foreground flex h-svh flex-col">
       <div className="border-border bg-background/80 sticky top-0 border-b px-6 py-4">
@@ -19,22 +21,24 @@ function MarketPicker({ markets }: { markets: Market[] }) {
       </div>
       <div className="flex flex-1 flex-col items-center overflow-y-auto px-4 py-8 sm:px-6">
         <div className="w-full max-w-md space-y-3">
-          {markets.map((market) => (
+          {sorted.map((market) => (
             <button
               key={market.id}
               type="button"
               onClick={() => router.push(`/market/${market.id}`)}
               className="border-border hover:border-primary/50 hover:bg-card group w-full rounded border p-4 text-left transition-colors"
             >
-              <p className="text-foreground text-sm font-semibold">{market.name}</p>
+              <div className="flex items-start justify-between gap-4">
+                <p className="text-foreground text-sm font-semibold">{market.name}</p>
+                <p className="text-muted-foreground/60 shrink-0 font-mono text-[10px]">
+                  {market.signal_count ?? 0} signals
+                </p>
+              </div>
               {market.description && (
                 <p className="text-muted-foreground mt-1 line-clamp-2 text-xs leading-snug">
                   {market.description}
                 </p>
               )}
-              <p className="text-muted-foreground/60 mt-2 font-mono text-[10px]">
-                {market.signal_count ?? 0} signals
-              </p>
             </button>
           ))}
           <button

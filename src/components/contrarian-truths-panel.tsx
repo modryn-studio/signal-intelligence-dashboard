@@ -541,8 +541,8 @@ export function ContrarianTruthsPanel() {
   );
 
   const validatedUnassessed = (truths ?? []).filter(
-    (t): t is ContrarianTruth & { status: 'validated' } =>
-      t.status === 'validated' && !t.lifestyle_pass
+    (t): t is ContrarianTruth & { status: 'validated'; proven_market: string } =>
+      t.status === 'validated' && !t.lifestyle_pass && typeof t.proven_market === 'string'
   );
 
   const filtered = (truths || []).filter((t) => {

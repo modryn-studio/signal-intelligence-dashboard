@@ -1,32 +1,42 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/db'
-import { SOURCE_CATEGORIES } from '@/lib/types'
+import { NextRequest, NextResponse } from 'next/server';
+import { sql, getActiveMarketId } from '@/lib/db';
+import { SOURCE_CATEGORIES } from '@/lib/types';
+
+// Escape HTML entities to prevent malformed email output from user-controlled fields
+function esc(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { email } = body
+    const body = await request.json();
+    const { email } = body;
 
     if (!email) {
-      return NextResponse.json({ error: 'email is required' }, { status: 400 })
+      return NextResponse.json({ error: 'email is required' }, { status: 400 });
     }
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toISOString().split('T')[0];
+    const marketId = await getActiveMarketId();
 
     const [inputs, observations, truths] = await Promise.all([
-      sql`SELECT * FROM signal_inputs WHERE date = ${today} ORDER BY source_category, created_at DESC`,
-      sql`SELECT * FROM observations WHERE date = ${today} ORDER BY created_at DESC`,
-      sql`SELECT * FROM contrarian_truths WHERE status IN ('forming', 'confident') ORDER BY conviction_level DESC LIMIT 5`,
-    ])
+      sql`SELECT * FROM signal_inputs WHERE date = ${today} AND (${marketId}::int IS NULL OR market_id = ${marketId}) ORDER BY source_category, created_at DESC`,
+      sql`SELECT * FROM observations WHERE date = ${today} AND (${marketId}::int IS NULL OR market_id = ${marketId}) ORDER BY created_at DESC`,
+      sql`SELECT * FROM contrarian_truths WHERE status != 'invalidated' AND (${marketId}::int IS NULL OR market_id = ${marketId}) ORDER BY conviction_level DESC LIMIT 5`,
+    ]);
 
     const inputsByCategory = inputs.reduce((acc: Record<string, typeof inputs>, input) => {
-      const cat = input.source_category as string
-      if (!acc[cat]) acc[cat] = []
-      acc[cat].push(input)
-      return acc
-    }, {})
+      const cat = input.source_category as string;
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(input);
+      return acc;
+    }, {});
 
-    const categoryLabels = SOURCE_CATEGORIES
+    const categoryLabels = SOURCE_CATEGORIES;
 
     const htmlBody = `
 <!DOCTYPE html>
@@ -91,49 +101,77 @@ export async function POST(request: NextRequest) {
       </div>
     </div>
 
-    ${Object.keys(inputsByCategory).length > 0 ? `
+    ${
+      Object.keys(inputsByCategory).length > 0
+        ? `
     <div class="section">
       <div class="section-label">Today's Inputs</div>
-      ${Object.entries(inputsByCategory).map(([cat, catInputs]) => `
+      ${Object.entries(inputsByCategory)
+        .map(
+          ([cat, catInputs]) => `
         <div class="category">
           <div class="category-name ${cat}">${categoryLabels[cat as keyof typeof categoryLabels]?.label || cat}</div>
-          ${(catInputs as Array<{title: string; source: string; notes?: string; url?: string}>).map(input => `
+          ${(catInputs as Array<{ title: string; source: string; notes?: string; url?: string }>)
+            .map(
+              (input) => `
           <div class="input-item">
-            <div class="input-title">${input.url ? `<a href="${input.url}" style="color: #e8e8e8; text-decoration: none;">${input.title}</a>` : input.title}</div>
-            <div class="input-source">${input.source}</div>
-            ${input.notes ? `<div class="input-notes">${input.notes}</div>` : ''}
+            <div class="input-title">${input.url ? `<a href="${esc(input.url)}" style="color: #e8e8e8; text-decoration: none;">${esc(input.title)}</a>` : esc(input.title)}</div>
+            <div class="input-source">${esc(input.source)}</div>
+            ${input.notes ? `<div class="input-notes">${esc(input.notes)}</div>` : ''}
           </div>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
-      `).join('')}
+      `
+        )
+        .join('')}
     </div>
-    ` : '<div class="section"><div class="section-label">Today\'s Inputs</div><p style="color:#555; font-size:12px;">No inputs logged today.</p></div>'}
+    `
+        : '<div class="section"><div class="section-label">Today\'s Inputs</div><p style="color:#555; font-size:12px;">No inputs logged today.</p></div>'
+    }
 
-    ${observations.length > 0 ? `
+    ${
+      observations.length > 0
+        ? `
     <div class="section">
       <div class="section-label">Observations</div>
-      ${(observations as Array<{title: string; body: string}>).map(obs => `
+      ${(observations as Array<{ title: string; body: string }>)
+        .map(
+          (obs) => `
       <div class="obs-item">
-        <div class="obs-title">${obs.title}</div>
-        <div class="obs-body">${obs.body}</div>
+        <div class="obs-title">${esc(obs.title)}</div>
+        <div class="obs-body">${esc(obs.body)}</div>
       </div>
-      `).join('')}
+      `
+        )
+        .join('')}
     </div>
-    ` : ''}
+    `
+        : ''
+    }
 
-    ${truths.length > 0 ? `
+    ${
+      truths.length > 0
+        ? `
     <div class="section">
       <div class="section-label">Active Theses</div>
-      ${(truths as Array<{thesis: string; conviction_level: number; status: string}>).map(truth => `
+      ${(truths as Array<{ thesis: string; conviction_level: number; status: string }>)
+        .map(
+          (truth) => `
       <div class="truth-item">
-        <div class="truth-thesis">"${truth.thesis}"</div>
+        <div class="truth-thesis">&ldquo;${esc(truth.thesis)}&rdquo;</div>
         <div class="truth-meta">
-          Conviction: ${'●'.repeat(truth.conviction_level)}${'○'.repeat(5 - truth.conviction_level)} &nbsp;|&nbsp; ${truth.status}
+          Conviction: ${'●'.repeat(truth.conviction_level)}${'○'.repeat(5 - truth.conviction_level)} &nbsp;|&nbsp; ${esc(truth.status)}
         </div>
       </div>
-      `).join('')}
+      `
+        )
+        .join('')}
     </div>
-    ` : ''}
+    `
+        : ''
+    }
 
     <div class="footer">
       Signal Intelligence Dashboard &mdash; Daily Digest &mdash; ${today}
@@ -141,12 +179,12 @@ export async function POST(request: NextRequest) {
   </div>
 </body>
 </html>
-    `
+    `;
 
     await sql`
       INSERT INTO email_digests (recipient_email, digest_date, inputs_count, observations_count, status)
       VALUES (${email}, ${today}, ${inputs.length}, ${observations.length}, 'sent')
-    `
+    `;
 
     return NextResponse.json({
       success: true,
@@ -156,9 +194,9 @@ export async function POST(request: NextRequest) {
         observations: observations.length,
         truths: truths.length,
       },
-    })
+    });
   } catch (error) {
-    console.error('[digest] POST error:', error)
-    return NextResponse.json({ error: 'Failed to generate digest' }, { status: 500 })
+    console.error('[digest] POST error:', error);
+    return NextResponse.json({ error: 'Failed to generate digest' }, { status: 500 });
   }
 }

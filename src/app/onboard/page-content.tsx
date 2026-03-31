@@ -1,166 +1,317 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 
-const SYNTH_MESSAGES = [
-  'Reading what you wrote\u2026',
-  'Identifying your market\u2026',
-  'Searching for your communities\u2026',
-  'Building your workspace\u2026',
-];
+// ── Constants ──────────────────────────────────────────────────────────────
 
-type SynthesisResult = {
+const INTEREST_TAGS = [
+  'freelance',
+  'dev tools',
+  'finance',
+  'e-commerce',
+  'fitness',
+  'real estate',
+  'creators',
+  'healthcare',
+  'legal',
+  'logistics',
+  'education',
+  'restaurants',
+] as const;
+
+const STEER_TAGS = [
+  'more technical',
+  'more niche',
+  'different industry',
+  'I use this daily',
+  'show me boring markets',
+  'B2B focus',
+  'more underserved',
+] as const;
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+type Demand = 'proven' | 'growing' | 'crowded';
+
+type MarketOption = {
+  overall_market: string;
+  niche: string;
+  micro_niche: string;
   market_name: string;
+  price_range: string;
+  demand: Demand;
   description: string;
   reasoning?: string;
   recommended_sources: { source_type: string; value: string }[];
 };
 
-type Source = { source_type: string; value: string; checked: boolean };
-type Step = 'welcome' | 'describing' | 'synthesizing' | 'reveal';
+type Step = 'interests' | 'picking';
+
+// ── Sub-components ─────────────────────────────────────────────────────────
+
+const DEMAND_STYLES: Record<Demand, { label: string; className: string }> = {
+  proven: {
+    label: 'proven demand',
+    className: 'text-primary border-(--color-primary) border-opacity-40',
+  },
+  growing: {
+    label: 'growing',
+    className: 'text-muted-foreground border-border',
+  },
+  crowded: {
+    label: 'crowded',
+    className: 'text-destructive/70 border-destructive/30',
+  },
+};
+
+function MarketCard({
+  market,
+  onSelect,
+  disabled,
+}: {
+  market: MarketOption;
+  onSelect: () => void;
+  disabled: boolean;
+}) {
+  const demand = DEMAND_STYLES[market.demand] ?? DEMAND_STYLES.growing;
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      disabled={disabled}
+      className="border-border hover:border-primary/50 bg-card group w-full rounded border p-4 text-left transition-colors disabled:pointer-events-none disabled:opacity-50"
+    >
+      {/* Three-layer breadcrumb */}
+      <p className="text-muted-foreground font-mono text-[10px] tracking-widest">
+        {market.overall_market} · {market.niche}
+      </p>
+
+      {/* Micro niche name — the thing you build for */}
+      <p className="text-foreground mt-1 text-sm leading-snug font-semibold">
+        {market.market_name}
+      </p>
+
+      {/* Exact person + problem */}
+      <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{market.micro_niche}</p>
+
+      {/* Price + demand */}
+      <div className="mt-3 flex items-center gap-2">
+        <span className="text-muted-foreground font-mono text-[11px]">{market.price_range}</span>
+        <span className={`rounded border px-1.5 py-0.5 font-mono text-[10px] ${demand.className}`}>
+          {demand.label}
+        </span>
+      </div>
+    </button>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="border-border bg-card animate-pulse rounded border p-4">
+      <div className="bg-muted-foreground/20 h-2.5 w-32 rounded" />
+      <div className="bg-muted-foreground/20 mt-2 h-4 w-48 rounded" />
+      <div className="bg-muted-foreground/20 mt-1.5 h-3 w-full rounded" />
+      <div className="bg-muted-foreground/20 mt-1 h-3 w-3/4 rounded" />
+      <div className="mt-3 flex gap-2">
+        <div className="bg-muted-foreground/20 h-3 w-16 rounded" />
+        <div className="bg-muted-foreground/20 h-3 w-20 rounded" />
+      </div>
+    </div>
+  );
+}
+// ── Excavate loading screen ──────────────────────────────────────────
+
+function ExcavateLoading() {
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setWide(true), 50);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div className="bg-background text-foreground flex min-h-svh flex-col items-center justify-center px-4 sm:px-6">
+      <div className="w-full max-w-sm">
+        <p className="text-primary font-mono text-[10px] tracking-widest uppercase">
+          Signal Intelligence
+        </p>
+        <h2 className="text-foreground mt-4 text-xl font-semibold">Finding your markets</h2>
+        <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+          Searching the web for real demand data.
+          <br />
+          Takes about a minute.
+        </p>
+        <div className="bg-border/50 mt-8 h-px w-full overflow-hidden">
+          <div
+            className="bg-primary h-full"
+            style={{
+              width: wide ? '92%' : '0%',
+              transition: 'width 80s linear',
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+// ── Main component ─────────────────────────────────────────────────────────
 
 export function OnboardContent() {
   const router = useRouter();
-  const [step, setStep] = useState<Step>('welcome');
-  const [userInput, setUserInput] = useState('');
-  const [visible, setVisible] = useState(true);
-  const [synthMsgIndex, setSynthMsgIndex] = useState(0);
-  const [synthMsgVisible, setSynthMsgVisible] = useState(true);
-  const [synthesis, setSynthesis] = useState<SynthesisResult | null>(null);
-  const [marketName, setMarketName] = useState('');
-  const [description, setDescription] = useState('');
-  const [sources, setSources] = useState<Source[]>([]);
-  const [newSource, setNewSource] = useState('');
+
+  const [step, setStep] = useState<Step>('interests');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [freeText, setFreeText] = useState('');
+  const [markets, setMarkets] = useState<MarketOption[]>([]);
+  const [selectedSteer, setSelectedSteer] = useState<string[]>([]);
+  const [steerExpanded, setSteerExpanded] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Fade between steps
-  function transition(fn: () => void) {
-    setVisible(false);
-    setTimeout(() => {
-      fn();
-      setVisible(true);
-    }, 150);
+  function toggleTag(tag: string) {
+    setSelectedTags((prev) => {
+      if (prev.includes(tag)) return prev.filter((t) => t !== tag);
+      if (prev.length >= 3) return prev; // max 3
+      return [...prev, tag];
+    });
   }
 
-  // Cycle synthesizing messages with fade
-  useEffect(() => {
-    if (step !== 'synthesizing') return;
-    const interval = setInterval(() => {
-      setSynthMsgVisible(false);
-      setTimeout(() => {
-        setSynthMsgIndex((i) => (i + 1) % SYNTH_MESSAGES.length);
-        setSynthMsgVisible(true);
-      }, 250);
-    }, 1600);
-    return () => clearInterval(interval);
-  }, [step]);
+  function toggleSteer(tag: string) {
+    setSelectedSteer((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  }
 
-  // Focus textarea on describing step
-  useEffect(() => {
-    if (step === 'describing' && visible) {
-      const t = setTimeout(() => textareaRef.current?.focus(), 60);
-      return () => clearTimeout(t);
-    }
-  }, [step, visible]);
-
-  async function doSynthesize() {
-    transition(() => {
-      setStep('synthesizing');
-      setSynthMsgIndex(0);
-      setSynthMsgVisible(true);
-    });
+  async function doExcavate(steerOverride?: string[]) {
+    setError('');
+    setLoading(true);
     try {
       const res = await fetch('/api/agent/excavate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: userInput }),
+        body: JSON.stringify({
+          tags: selectedTags,
+          description: freeText.trim() || undefined,
+          steer: steerOverride ?? (selectedSteer.length ? selectedSteer : undefined),
+        }),
       });
       if (!res.ok) throw new Error();
-      const data = (await res.json()) as SynthesisResult;
-      setSynthesis(data);
-      setMarketName(data.market_name || '');
-      setDescription(data.description || '');
-      setSources((data.recommended_sources || []).map((s) => ({ ...s, checked: true })));
-      transition(() => setStep('reveal'));
+      const data = (await res.json()) as { markets: MarketOption[] };
+      setMarkets(data.markets ?? []);
+      setSteerExpanded(false);
+      setSelectedSteer([]);
+      setStep('picking');
     } catch {
-      transition(() => {
-        setStep('describing');
-        setError('Synthesis failed. Try again.');
-      });
+      setError('Something went wrong. Try again.');
+    } finally {
+      setLoading(false);
     }
   }
 
-  async function handleConfirm() {
-    if (!marketName.trim()) {
-      setError('Market name is required.');
-      return;
-    }
-    setError('');
+  async function handleSelectMarket(market: MarketOption) {
     setSaving(true);
     try {
-      const checkedSources = sources.filter((s) => s.checked);
+      const checkedSources = market.recommended_sources ?? [];
       const res = await fetch('/api/markets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: marketName.trim(),
-          description: description.trim() || null,
+          name: market.market_name,
+          description: market.micro_niche,
           sources: checkedSources.map(({ source_type, value }) => ({ source_type, value })),
         }),
       });
       if (!res.ok) throw new Error();
-      const { market } = (await res.json()) as { market: { id: number } };
-      router.push(`/market/${market.id}?fresh=1`);
+      const { market: created } = (await res.json()) as { market: { id: number } };
+
+      // Fire agent silently — no await, no modal
+      fetch('/api/agent/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ today: new Date().toISOString().slice(0, 10) }),
+      }).catch(() => {});
+
+      router.push(`/market/${created.id}`);
     } catch {
       setError('Something went wrong. Try again.');
       setSaving(false);
     }
   }
 
-  function addCustomSource() {
-    const val = newSource.trim().replace(/^r\//, '');
-    if (!val) return;
-    setSources((prev) => [...prev, { source_type: 'subreddit', value: val, checked: true }]);
-    setNewSource('');
-  }
-
   function handleSkip() {
-    // Clear any stale flag so MarketGate does a fresh DB check
-    localStorage.removeItem('skipMarketOnboard');
+    // Flag prevents MarketGate from redirecting back here when there are 0 markets
+    localStorage.setItem('skipMarketOnboard', 'true');
     router.push('/');
   }
 
-  const fade = `transition-opacity duration-150 ${visible ? 'opacity-100' : 'opacity-0'}`;
+  // ── Loading ─────────────────────────────────────────────────────────────
 
-  // ── Welcome ──────────────────────────────────────────────────────────────
-  if (step === 'welcome') {
+  if (loading) {
+    return <ExcavateLoading />;
+  }
+
+  // ── Screen 1 — Interests ─────────────────────────────────────────────────
+
+  if (step === 'interests') {
+    const canProceed = selectedTags.length >= 1 || freeText.trim().length > 0;
+
     return (
-      <div className="bg-background text-foreground flex min-h-svh flex-col items-center justify-center px-6 py-16">
-        <div className={`w-full max-w-xs text-center ${fade}`}>
+      <div className="bg-background text-foreground flex min-h-svh flex-col items-center justify-center px-4 py-16 sm:px-6">
+        <div className="w-full max-w-sm">
           <p className="text-primary font-mono text-[10px] tracking-widest uppercase">
             Signal Intelligence
           </p>
-          <h1 className="text-foreground mt-5 text-2xl leading-snug font-semibold">
-            Find the market you should be building in.
+          <h1 className="text-foreground mt-4 text-2xl leading-snug font-semibold">
+            What are you into?
           </h1>
-          <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
-            Describe a space.
-            <br />
-            Your workspace appears on the other side.
+          <p className="text-muted-foreground mt-1.5 text-sm">
+            Pick up to 3 — or describe it yourself.
           </p>
-          <div className="mt-9 flex flex-col items-center gap-4">
+
+          {/* Tag grid */}
+          <div className="mt-6 flex flex-wrap gap-2">
+            {INTEREST_TAGS.map((tag) => {
+              const active = selectedTags.includes(tag);
+              const maxed = selectedTags.length >= 3 && !active;
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => toggleTag(tag)}
+                  disabled={maxed}
+                  className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors disabled:opacity-30 ${
+                    active
+                      ? 'border-primary text-primary bg-primary/10'
+                      : 'border-border text-muted-foreground hover:border-muted-foreground'
+                  }`}
+                >
+                  {tag}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Free text */}
+          <Input
+            value={freeText}
+            onChange={(e) => setFreeText(e.target.value)}
+            placeholder="or describe it in your own words…"
+            className="mt-4 text-sm"
+          />
+
+          {error && <p className="text-destructive mt-2 text-xs">{error}</p>}
+
+          <div className="mt-7 flex flex-col items-center gap-3">
             <Button
               type="button"
-              onClick={() => transition(() => setStep('describing'))}
+              onClick={() => doExcavate()}
+              disabled={!canProceed}
               className="w-full rounded-none"
             >
-              Start →
+              Find my markets →
             </Button>
             <button
               type="button"
@@ -175,169 +326,95 @@ export function OnboardContent() {
     );
   }
 
-  // ── Describing ────────────────────────────────────────────────────────────
-  if (step === 'describing') {
+  // ── Screen 2 — Picking ───────────────────────────────────────────────────
+
+  if (step === 'picking') {
     return (
-      <div className="bg-background text-foreground flex min-h-svh flex-col items-center justify-center px-6 py-14">
-        <div className={`w-full max-w-sm ${fade}`}>
-          <p className="text-foreground text-xl leading-snug font-semibold">
-            Describe a space you know, work in, or keep getting frustrated by.
-          </p>
-          <p className="text-muted-foreground/60 mt-1.5 font-mono text-[11px]">
-            An industry, a job, a tool you hate, a problem that keeps coming back.
-          </p>
+      <div className="bg-background text-foreground flex min-h-svh flex-col items-center px-4 py-14 sm:px-6">
+        <div className="w-full max-w-sm">
+          <button
+            type="button"
+            onClick={() => setStep('interests')}
+            className="text-muted-foreground/50 hover:text-muted-foreground text-xs transition-colors"
+          >
+            ← Back
+          </button>
 
-          <Textarea
-            ref={textareaRef}
-            value={userInput}
-            onChange={(e) => setUserInput(e.target.value)}
-            rows={5}
-            className="mt-5 resize-none text-sm"
-            placeholder="..."
-          />
+          <h2 className="text-foreground mt-4 text-xl leading-snug font-semibold">
+            Pick the one that fits.
+          </h2>
+          <p className="text-muted-foreground mt-1 text-sm">You can change it later.</p>
 
-          {error && <p className="text-destructive mt-2 text-xs">{error}</p>}
-
-          <div className="mt-5 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => transition(() => setStep('welcome'))}
-              className="text-muted-foreground/50 hover:text-muted-foreground text-xs transition-colors"
-            >
-              ← Back
-            </button>
-            {userInput.trim() && (
-              <Button type="button" onClick={doSynthesize} className="rounded-none">
-                Find my market →
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Synthesizing ──────────────────────────────────────────────────────────
-  if (step === 'synthesizing') {
-    return (
-      <div className="bg-background text-foreground flex min-h-svh flex-col items-center justify-center gap-5">
-        <div className="border-primary/30 border-t-primary h-7 w-7 animate-spin rounded-full border-2" />
-        <p
-          className={`text-muted-foreground font-mono text-xs transition-opacity duration-300 ${synthMsgVisible ? 'opacity-100' : 'opacity-0'}`}
-        >
-          {SYNTH_MESSAGES[synthMsgIndex]}
-        </p>
-      </div>
-    );
-  }
-
-  // ── Reveal ────────────────────────────────────────────────────────────────
-  if (step === 'reveal' && synthesis) {
-    return (
-      <div className="bg-background text-foreground flex min-h-svh flex-col items-center overflow-y-auto px-6 py-14">
-        <div className={`w-full max-w-sm ${fade}`}>
-          {/* Header */}
-          <p className="text-primary font-mono text-[10px] tracking-widest uppercase">
-            Your market workspace
-          </p>
-
-          {/* Market name — editable heading */}
-          <input
-            type="text"
-            value={marketName}
-            onChange={(e) => setMarketName(e.target.value)}
-            className="text-foreground border-b-border focus:border-b-primary mt-2 w-full border-b bg-transparent pb-1 text-xl font-semibold transition-colors outline-none"
-          />
-
-          {/* Reasoning — Claude's proposal. Non-editable. */}
-          {synthesis.reasoning && (
-            <div className="border-primary/40 mt-4 border-l-2 pl-3">
-              <p className="text-muted-foreground text-xs leading-relaxed italic">
-                {synthesis.reasoning}
-              </p>
-            </div>
-          )}
-
-          {/* Description */}
-          <div className="mt-6">
-            <label className="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-              Description
-            </label>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              className="mt-1.5 resize-none text-sm"
-            />
-          </div>
-
-          {/* Sources */}
-          {sources.length > 0 && (
-            <div className="mt-5">
-              <label className="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-                Sources to watch
-              </label>
-              <div className="mt-2 space-y-2">
-                {sources.map((src, i) => (
-                  <label key={i} className="flex cursor-pointer items-center gap-2.5">
-                    <input
-                      type="checkbox"
-                      checked={src.checked}
-                      onChange={() =>
-                        setSources((prev) =>
-                          prev.map((s, j) => (j === i ? { ...s, checked: !s.checked } : s))
-                        )
-                      }
-                      className="accent-primary h-3.5 w-3.5"
-                    />
-                    <span className="text-foreground font-mono text-xs">r/{src.value}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Add source */}
-          <div className="mt-3 flex gap-2">
-            <Input
-              value={newSource}
-              onChange={(e) => setNewSource(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addCustomSource()}
-              placeholder="Add a subreddit"
-              className="text-sm"
-            />
-            <Button type="button" onClick={addCustomSource} className="shrink-0 rounded-none">
-              Add
-            </Button>
+          {/* Market cards */}
+          <div className="mt-5 flex flex-col gap-3">
+            {markets.map((market, i) => (
+              <MarketCard
+                key={i}
+                market={market}
+                onSelect={() => handleSelectMarket(market)}
+                disabled={saving}
+              />
+            ))}
           </div>
 
           {error && <p className="text-destructive mt-3 text-xs">{error}</p>}
 
-          {/* CTA */}
-          <div className="mt-9 flex flex-col items-center gap-3">
-            <Button
-              type="button"
-              onClick={handleConfirm}
-              disabled={saving || !marketName.trim()}
-              className="w-full rounded-none"
-            >
-              {saving ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border border-current border-t-transparent" />
-                  Saving&hellip;
-                </span>
-              ) : (
-                'Start observing →'
+          {/* Escape hatch — inline, never navigates away */}
+          {!loading && markets.length > 0 && (
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={() => setSteerExpanded((v) => !v)}
+                className="text-muted-foreground/60 hover:text-muted-foreground text-xs transition-colors"
+              >
+                {steerExpanded ? '↑ Collapse' : 'None of these feel right — let me refine ›'}
+              </button>
+
+              {steerExpanded && (
+                <div className="mt-3">
+                  <div className="flex flex-wrap gap-2">
+                    {STEER_TAGS.map((tag) => {
+                      const active = selectedSteer.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => toggleSteer(tag)}
+                          className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors ${
+                            active
+                              ? 'border-primary text-primary bg-primary/10'
+                              : 'border-border text-muted-foreground hover:border-muted-foreground'
+                          }`}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-4">
+                    <Button
+                      type="button"
+                      onClick={() => doExcavate()}
+                      disabled={selectedSteer.length === 0}
+                      className="rounded-none"
+                    >
+                      Regenerate →
+                    </Button>
+
+                    <button
+                      type="button"
+                      onClick={() => doExcavate(['completely different'])}
+                      disabled={loading}
+                      className="text-muted-foreground/50 hover:text-muted-foreground text-xs transition-colors"
+                    >
+                      Show me something completely different →
+                    </button>
+                  </div>
+                </div>
               )}
-            </Button>
-            <button
-              type="button"
-              onClick={() => transition(() => setStep('describing'))}
-              className="text-muted-foreground/40 hover:text-muted-foreground/70 text-xs transition-colors"
-            >
-              ← Something&rsquo;s off? Start over
-            </button>
-          </div>
+            </div>
+          )}
         </div>
       </div>
     );
