@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,6 +76,45 @@ function writeDiscoverCache(marketKey: string, sources: DiscoveredSource[]) {
   }
 }
 
+// ── Session persistence ────────────────────────────────────────────────────
+// Survives refresh. The excavate + discover caches are date-scoped, so a new
+// day automatically falls back to screen 1 without any extra expiry logic.
+
+interface OnboardSession {
+  step: Step;
+  selectedTags: string[];
+  freeText: string;
+  selectedMarketIndex: number | null;
+}
+
+const SESSION_KEY = 'onboard-session';
+
+function readSession(): OnboardSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as OnboardSession;
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(s: OnboardSession) {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(s));
+  } catch {
+    /* quota — skip */
+  }
+}
+
+function clearSession() {
+  try {
+    localStorage.removeItem(SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const INTEREST_TAGS = [
@@ -101,6 +140,7 @@ const STEER_TAGS = [
   'show me boring markets',
   'B2B focus',
   'more underserved',
+  'completely different',
 ] as const;
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -112,10 +152,10 @@ type MarketOption = {
   niche: string;
   micro_niche: string;
   market_name: string;
-  price_range: string;
   demand: Demand;
   description: string;
-  reasoning?: string;
+  top_pick?: boolean;
+  top_pick_reason?: string;
   recommended_sources: { source_type: string; value: string }[];
 };
 
@@ -143,13 +183,11 @@ function MarketCard({
   onSelect,
   disabled,
   selected,
-  enriching,
 }: {
   market: MarketOption;
   onSelect: () => void;
   disabled: boolean;
   selected?: boolean;
-  enriching?: boolean;
 }) {
   const demand = DEMAND_STYLES[market.demand] ?? DEMAND_STYLES.growing;
 
@@ -158,7 +196,7 @@ function MarketCard({
       type="button"
       onClick={onSelect}
       disabled={disabled}
-      className={`bg-card group w-full rounded border p-4 text-left transition-colors disabled:pointer-events-none disabled:opacity-50 ${
+      className={`bg-card w-full rounded border p-4 text-left transition-colors disabled:pointer-events-none disabled:opacity-50 ${
         selected ? 'border-primary ring-primary/20 ring-2' : 'border-border hover:border-primary/50'
       }`}
     >
@@ -170,20 +208,23 @@ function MarketCard({
       {/* The person — who this market is */}
       <p className="text-foreground mt-1 text-sm leading-snug font-semibold">{market.niche}</p>
 
-      {/* Their world — what they pay for, what frustrates them */}
+      {/* Their world — what frustrates them */}
       <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{market.description}</p>
 
-      {/* Price + demand */}
+      {/* Demand signal + top pick badge */}
       <div className="mt-3 flex items-center gap-2">
-        {enriching && !market.reasoning ? (
-          <span className="bg-muted-foreground/15 h-3 w-16 animate-pulse rounded" />
-        ) : (
-          <span className="text-muted-foreground font-mono text-[11px]">{market.price_range}</span>
-        )}
         <span className={`rounded border px-1.5 py-0.5 font-mono text-[10px] ${demand.className}`}>
           {demand.label}
         </span>
+        {market.top_pick && (
+          <span className="text-primary rounded border border-(--color-primary) px-1.5 py-0.5 font-mono text-[10px]">
+            best fit
+          </span>
+        )}
       </div>
+      {market.top_pick && market.top_pick_reason && (
+        <p className="text-primary/70 mt-2 text-[11px] leading-snug">{market.top_pick_reason}</p>
+      )}
     </button>
   );
 }
@@ -244,15 +285,6 @@ function ExcavateLoading({ onCancel }: { onCancel: () => void }) {
 }
 // ── Main component ─────────────────────────────────────────────────────────
 
-// Always-on sources — not stored in market_sources, always fetched by agent/run
-const ALWAYS_ON_SOURCES = [
-  { name: 'Hacker News', description: 'Top stories >30 points, daily', status: 'live' },
-  { name: 'Product Hunt', description: 'Top 20 launches by votes', status: 'needs_api_key' },
-  { name: 'Indie Hackers', description: 'Top weekly posts', status: 'fragile' },
-  { name: 'r/SaaS', description: 'Top daily posts', status: 'live' },
-  { name: 'r/Entrepreneur', description: 'Top daily posts', status: 'live' },
-] as const;
-
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
   live: { label: 'live', className: 'text-emerald-500 border-emerald-500/40' },
   fragile: { label: 'fragile', className: 'text-amber-500 border-amber-500/40' },
@@ -283,6 +315,7 @@ function SourceCard({
           enabled ? 'border-primary bg-primary' : 'border-border'
         }`}
         aria-label={enabled ? 'Disable source' : 'Enable source'}
+        style={{ touchAction: 'manipulation' }}
       >
         {enabled && (
           <svg viewBox="0 0 16 16" className="h-4 w-4 text-white">
@@ -339,7 +372,6 @@ export function OnboardContent() {
   const [steerExpanded, setSteerExpanded] = useState(false);
   const [loading, setLoading] = useState(false); // full-screen loader (Phase 1 in flight)
   const [steerLoading, setSteerLoading] = useState(false); // dim cards during steer
-  const [streamDone, setStreamDone] = useState(false); // false = Phase 2 still enriching
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -356,12 +388,51 @@ export function OnboardContent() {
   const abortRef = useRef<AbortController | null>(null);
 
   // Cancel any in-flight Anthropic calls when the component unmounts
-  // (e.g. user navigates to /market/[id] after selecting)
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
     };
   }, []);
+
+  // Restore session before first paint — useLayoutEffect fires synchronously
+  // before the browser paints, so the user never sees the wrong screen.
+  // Safe to use here because page.tsx uses dynamic(..., { ssr: false }).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    const s = readSession();
+    if (!s) return;
+
+    setSelectedTags(s.selectedTags);
+    setFreeText(s.freeText);
+    if (s.step === 'interests') return;
+
+    // Markets must still be in the day-scoped excavate cache
+    const key = excavateCacheKey(s.selectedTags, s.freeText);
+    const cachedMarkets = readExcavateCache(key);
+    if (!cachedMarkets?.length) return; // cache expired — stay on interests with tags restored
+
+    setMarkets(cachedMarkets);
+    setSelectedMarketIndex(s.selectedMarketIndex);
+
+    if (s.step === 'sources' && s.selectedMarketIndex !== null) {
+      const market = cachedMarkets[s.selectedMarketIndex];
+      if (!market) {
+        setStep('picking');
+        return;
+      }
+      setPendingMarket(market);
+      setStep('sources');
+      void startDiscovery(market); // checks discover cache first
+      return;
+    }
+
+    setStep('picking');
+  }, []);
+
+  // Persist session whenever navigation state changes
+  useEffect(() => {
+    writeSession({ step, selectedTags, freeText, selectedMarketIndex });
+  }, [step, selectedTags, freeText, selectedMarketIndex]);
 
   function toggleTag(tag: string) {
     setSelectedTags((prev) => {
@@ -377,28 +448,31 @@ export function OnboardContent() {
     );
   }
 
-  async function doExcavate(steerOverride?: string[], forceRefresh = false) {
+  async function doExcavate(steerOverride?: string[]) {
     setError('');
-    setStreamDone(false);
 
     const activeSteer = steerOverride ?? (selectedSteer.length ? selectedSteer : undefined);
     // Steer path: already have markets — cheap mutation, stay on picking screen
     const isSteer = !!(activeSteer?.length && markets.length > 0);
 
-    // Don't allow parallel excavations — steer is cheap but non-steer fires 4 web_search calls
+    // Hard guards — these protect against double-tap, race conditions, and
+    // state-transition edge cases that the UI disabled prop can't fully prevent
     if (!isSteer && loading) return;
-
-    // Check localStorage cache for non-steer, non-forced runs
-    if (!isSteer && !forceRefresh) {
+    if (isSteer && steerLoading) return;
+    if (!selectedTags.length && !freeText.trim()) return; // nothing to send
+    // Check localStorage cache for non-steer runs
+    if (!isSteer) {
       const key = excavateCacheKey(selectedTags, freeText);
       const cached = readExcavateCache(key);
       if (cached?.length) {
         setMarkets(cached);
-        setStreamDone(true);
         setStep('picking');
         return;
       }
     }
+
+    // Snapshot markets before clearing — needed to restore if steer aborts or errors
+    const prevMarkets = markets;
 
     // Abort any in-flight request
     abortRef.current?.abort();
@@ -407,6 +481,7 @@ export function OnboardContent() {
 
     if (isSteer) {
       setSteerLoading(true);
+      setMarkets([]);
     } else {
       setLoading(true);
       setMarkets([]);
@@ -454,29 +529,19 @@ export function OnboardContent() {
                 setSteerLoading(false);
                 if (!isSteer) setStep('picking');
               }
-            } else if (chunk.type === 'update') {
-              // Apply to local arrived array so the cache gets enriched data
-              const idx = arrived.findIndex((m) => m.market_name === chunk.data.market_name);
-              if (idx !== -1) arrived[idx] = { ...arrived[idx], ...chunk.data };
-              setMarkets((prev) =>
-                prev.map((m) =>
-                  m.market_name === chunk.data.market_name ? { ...m, ...chunk.data } : m
-                )
-              );
             } else if (chunk.type === 'done') {
-              setStreamDone(true);
               setSteerExpanded(false);
               setSelectedSteer([]);
               setSteerLoading(false);
-              // Write final enriched markets to localStorage
-              if (!isSteer) {
+              if (isSteer) {
+                setSelectedMarketIndex(null);
+              } else {
                 const key = excavateCacheKey(selectedTags, freeText);
-                // Use the latest state from arrived + any updates — React state may lag,
-                // so we rely on the arrived array as the base (updates were applied to state)
                 writeExcavateCache(key, arrived);
               }
             } else if (chunk.type === 'error') {
               setError(chunk.message ?? 'Something went wrong.');
+              if (isSteer) setMarkets(prevMarkets);
               setLoading(false);
               setSteerLoading(false);
             }
@@ -486,7 +551,11 @@ export function OnboardContent() {
         }
       }
     } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        if (isSteer) setMarkets(prevMarkets);
+        return;
+      }
+      if (isSteer) setMarkets(prevMarkets);
       setError('Something went wrong. Try again.');
     } finally {
       setLoading(false);
@@ -494,20 +563,9 @@ export function OnboardContent() {
     }
   }
 
-  // Screen 2 → Screen 3: confirm selection, start source discovery
-  async function handleContinue() {
-    if (selectedMarketIndex === null) return;
-    const market = markets[selectedMarketIndex];
-    if (!market) return;
-
-    setPendingMarket(market);
-    setDiscoveredSources([]);
-    setSourceToggles({});
-    setDiscoverDone(false);
-    setError('');
-    setStep('sources');
-
-    // Check localStorage cache first
+  // Fetch + stream sources for a market. Called by handleContinue and by the
+  // restore useLayoutEffect when refreshing on screen 3.
+  async function startDiscovery(market: MarketOption) {
     const cachedSources = readDiscoverCache(market.market_name);
     if (cachedSources) {
       setDiscoveredSources(cachedSources);
@@ -518,9 +576,9 @@ export function OnboardContent() {
       return;
     }
 
-    setDiscoverLoading(true);
+    if (discoverLoading) return; // already in flight — don't double-call
 
-    // Abort any in-flight request
+    setDiscoverLoading(true);
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -533,7 +591,6 @@ export function OnboardContent() {
           market_name: market.market_name,
           micro_niche: market.micro_niche,
           description: market.description,
-          // Pass subreddits found during enrich so discover-sources skips re-searching them
           existing_subreddits: (market.recommended_sources ?? [])
             .filter((s) => s.source_type === 'subreddit')
             .map((s) => s.value),
@@ -563,7 +620,6 @@ export function OnboardContent() {
             if (chunk.type === 'source') {
               arrived.push(chunk.data);
               setDiscoveredSources([...arrived]);
-              // Enable by default
               setSourceToggles((prev) => ({
                 ...prev,
                 [`${chunk.data.source_type}:${chunk.data.value}`]: true,
@@ -587,6 +643,21 @@ export function OnboardContent() {
     } finally {
       setDiscoverLoading(false);
     }
+  }
+
+  // Screen 2 → Screen 3
+  async function handleContinue() {
+    if (selectedMarketIndex === null) return;
+    const market = markets[selectedMarketIndex];
+    if (!market) return;
+
+    setPendingMarket(market);
+    setDiscoveredSources([]);
+    setSourceToggles({});
+    setDiscoverDone(false);
+    setError('');
+    setStep('sources');
+    await startDiscovery(market);
   }
 
   // Screen 3 → Dashboard: create market + start scanning
@@ -642,6 +713,7 @@ export function OnboardContent() {
         body: JSON.stringify({ today: new Date().toISOString().slice(0, 10) }),
       }).catch(() => {});
 
+      clearSession();
       router.push(`/market/${created.id}`);
     } catch {
       setError('Something went wrong. Try again.');
@@ -682,7 +754,7 @@ export function OnboardContent() {
             What are you into?
           </h1>
           <p className="text-muted-foreground mt-1.5 text-sm">
-            Pick up to 3 — or describe it yourself.
+            Pick up to 3 — or describe it yourself. Both work together.
           </p>
 
           {/* Tag grid */}
@@ -696,7 +768,7 @@ export function OnboardContent() {
                   type="button"
                   onClick={() => toggleTag(tag)}
                   disabled={maxed}
-                  className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors disabled:opacity-30 ${
+                  className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
                     active
                       ? 'border-primary text-primary bg-primary/10'
                       : 'border-border text-muted-foreground hover:border-muted-foreground'
@@ -712,7 +784,10 @@ export function OnboardContent() {
           <Input
             value={freeText}
             onChange={(e) => setFreeText(e.target.value)}
-            placeholder="or describe it in your own words…"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && canProceed) doExcavate();
+            }}
+            placeholder="add more context…"
             className="mt-4 text-sm"
           />
 
@@ -750,6 +825,7 @@ export function OnboardContent() {
             type="button"
             onClick={() => {
               abortRef.current?.abort();
+              setSelectedMarketIndex(null);
               setStep('interests');
             }}
             className="text-muted-foreground/50 hover:text-muted-foreground text-xs transition-colors"
@@ -760,19 +836,14 @@ export function OnboardContent() {
           <h2 className="text-foreground mt-4 text-xl leading-snug font-semibold">
             Pick the one that fits.
           </h2>
-          <div className="mt-1 flex items-center gap-2">
-            <p className="text-muted-foreground text-sm">You can change it later.</p>
-            {!streamDone && (
-              <span className="text-muted-foreground/50 font-mono text-[10px] tracking-wider">
-                verifying prices…
-              </span>
-            )}
-          </div>
+          {steerLoading && (
+            <div className="mt-1">
+              <p className="text-muted-foreground text-sm">Finding better options…</p>
+            </div>
+          )}
 
           {/* Market cards */}
-          <div
-            className={`mt-5 flex flex-col gap-3 transition-opacity ${steerLoading ? 'pointer-events-none opacity-40' : ''}`}
-          >
+          <div className="mt-5 flex flex-col gap-3">
             {markets.map((market, i) => (
               <MarketCard
                 key={i}
@@ -780,7 +851,6 @@ export function OnboardContent() {
                 onSelect={() => setSelectedMarketIndex(i)}
                 selected={selectedMarketIndex === i}
                 disabled={steerLoading}
-                enriching={!streamDone}
               />
             ))}
             {/* Skeleton cards while stream in flight */}
@@ -789,9 +859,27 @@ export function OnboardContent() {
             ))}
           </div>
 
+          {/* Cancel — only visible while steer is running */}
+          {steerLoading && (
+            <button
+              type="button"
+              onClick={() => {
+                abortRef.current?.abort();
+                setSteerLoading(false);
+              }}
+              className="text-muted-foreground/40 hover:text-muted-foreground mt-4 font-mono text-xs transition-colors"
+            >
+              Cancel
+            </button>
+          )}
+
           {/* Continue button — visible when a card is selected */}
           {selectedMarketIndex !== null && !steerLoading && (
-            <Button type="button" onClick={handleContinue} className="mt-5 w-full rounded-none">
+            <Button
+              type="button"
+              onClick={handleContinue}
+              className="animate-in fade-in mt-5 w-full rounded-none duration-150"
+            >
               Continue →
             </Button>
           )}
@@ -831,34 +919,14 @@ export function OnboardContent() {
                     })}
                   </div>
 
-                  <div className="mt-3 flex items-center gap-4">
-                    <Button
-                      type="button"
-                      onClick={() => doExcavate()}
-                      disabled={selectedSteer.length === 0}
-                      className="rounded-none"
-                    >
-                      Regenerate →
-                    </Button>
-
-                    <button
-                      type="button"
-                      onClick={() => doExcavate(['completely different'])}
-                      disabled={loading}
-                      className="text-muted-foreground/50 hover:text-muted-foreground text-xs transition-colors"
-                    >
-                      Show me something completely different →
-                    </button>
-                  </div>
-
-                  <button
+                  <Button
                     type="button"
-                    onClick={() => doExcavate(undefined, true)}
-                    disabled={loading}
-                    className="text-muted-foreground/30 hover:text-muted-foreground mt-3 font-mono text-[11px] transition-colors"
+                    onClick={() => doExcavate()}
+                    disabled={selectedSteer.length === 0 || steerLoading}
+                    className="mt-3 rounded-none"
                   >
-                    Re-run fresh (ignore cache) →
-                  </button>
+                    {steerLoading ? 'Trying…' : 'Try these →'}
+                  </Button>
                 </div>
               )}
             </div>
@@ -872,8 +940,9 @@ export function OnboardContent() {
 
   if (step === 'sources' && pendingMarket) {
     return (
-      <div className="bg-background text-foreground flex min-h-svh flex-col items-center px-4 py-14 sm:px-6">
-        <div className="w-full max-w-sm">
+      // Flex column fills the viewport — sources list scrolls, CTA stays at bottom
+      <div className="bg-background text-foreground flex min-h-svh flex-col px-4 sm:px-6">
+        <div className="mx-auto flex w-full max-w-sm flex-1 flex-col py-14">
           <button
             type="button"
             onClick={() => {
@@ -882,10 +951,11 @@ export function OnboardContent() {
               setPendingMarket(null);
               setDiscoveredSources([]);
               setSourceToggles({});
+              setDiscoverLoading(false);
               setDiscoverDone(false);
               setError('');
             }}
-            className="text-muted-foreground/50 hover:text-muted-foreground text-xs transition-colors"
+            className="text-muted-foreground/50 hover:text-muted-foreground -ml-1 self-start py-1 pl-1 text-xs transition-colors"
           >
             ← Back
           </button>
@@ -898,104 +968,87 @@ export function OnboardContent() {
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">
             {discoverLoading
-              ? 'Finding the best sources for your market…'
+              ? discoveredSources.length > 0
+                ? `Found ${discoveredSources.length} — looking for more…`
+                : 'Finding the best sources for your market…'
               : 'Toggle off anything you don\u2019t want.'}
           </p>
 
-          {/* Always-on sources */}
-          <div className="mt-5">
-            <p className="text-muted-foreground mb-2 font-mono text-[10px] tracking-widest uppercase">
-              Always on
+          {/* Sources list — flex-1 + overflow-y-auto so CTA never scrolls away */}
+          <div className="mt-5 flex min-h-0 flex-1 flex-col">
+            <p className="text-muted-foreground/50 mb-3 shrink-0 font-mono text-[10px]">
+              HN · Product Hunt · r/SaaS · and 2 more run by default.
             </p>
-            <div className="flex flex-col gap-1.5">
-              {ALWAYS_ON_SOURCES.map((s) => {
-                const statusInfo = STATUS_STYLES[s.status] ?? STATUS_STYLES.live;
-                return (
-                  <div
-                    key={s.name}
-                    className="border-border/50 bg-card/50 flex items-center gap-2 rounded border px-3 py-2"
-                  >
-                    <span className="text-muted-foreground text-xs font-medium">{s.name}</span>
-                    <span
-                      className={`rounded border px-1.5 py-0.5 font-mono text-[10px] ${statusInfo.className}`}
-                    >
-                      {statusInfo.label}
-                    </span>
-                    <span className="text-muted-foreground/50 text-[11px]">·</span>
-                    <span className="text-muted-foreground/60 text-[11px]">{s.description}</span>
-                  </div>
-                );
-              })}
+            <div className="flex-1 overflow-y-auto">
+              <div className="flex flex-col gap-2 pb-2">
+                {discoveredSources.map((src) => {
+                  const key = `${src.source_type}:${src.value}`;
+                  return (
+                    <div key={key} className="animate-in fade-in-0 duration-300">
+                      <SourceCard
+                        source={src}
+                        enabled={sourceToggles[key] !== false}
+                        onToggle={() =>
+                          setSourceToggles((prev) => ({ ...prev, [key]: !prev[key] }))
+                        }
+                        onRemove={() => {
+                          setDiscoveredSources((prev) =>
+                            prev.filter((s) => `${s.source_type}:${s.value}` !== key)
+                          );
+                          setSourceToggles((prev) => {
+                            const next = { ...prev };
+                            delete next[key];
+                            return next;
+                          });
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+                {/* Skeleton while discovering */}
+                {discoverLoading &&
+                  discoveredSources.length < 6 &&
+                  Array.from({ length: Math.max(1, 3 - discoveredSources.length) }).map((_, i) => (
+                    <SourceSkeleton key={`ss-${i}`} />
+                  ))}
+                {discoverDone && discoveredSources.length === 0 && (
+                  <p className="text-muted-foreground/60 text-xs">
+                    No additional sources found. Default sources will still run.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Discovered sources */}
-          <div className="mt-5">
-            <p className="text-muted-foreground mb-2 font-mono text-[10px] tracking-widest uppercase">
-              Discovered for this market
-            </p>
-            <div className="flex flex-col gap-2">
-              {discoveredSources.map((src) => {
-                const key = `${src.source_type}:${src.value}`;
-                return (
-                  <SourceCard
-                    key={key}
-                    source={src}
-                    enabled={sourceToggles[key] !== false}
-                    onToggle={() => setSourceToggles((prev) => ({ ...prev, [key]: !prev[key] }))}
-                    onRemove={() => {
-                      setDiscoveredSources((prev) =>
-                        prev.filter((s) => `${s.source_type}:${s.value}` !== key)
-                      );
-                      setSourceToggles((prev) => {
-                        const next = { ...prev };
-                        delete next[key];
-                        return next;
-                      });
-                    }}
-                  />
-                );
-              })}
-              {/* Skeleton while discovering */}
-              {discoverLoading &&
-                discoveredSources.length < 6 &&
-                Array.from({ length: Math.max(1, 3 - discoveredSources.length) }).map((_, i) => (
-                  <SourceSkeleton key={`ss-${i}`} />
-                ))}
-              {discoverDone && discoveredSources.length === 0 && (
-                <p className="text-muted-foreground/60 text-xs">
-                  No additional sources found. Default sources will still run.
-                </p>
-              )}
-            </div>
-          </div>
-
-          {error && <p className="text-destructive mt-3 text-xs">{error}</p>}
-
-          {/* CTA */}
-          <Button
-            type="button"
-            onClick={handleStartScanning}
-            disabled={saving || (!discoverDone && discoverLoading)}
-            className="mt-6 w-full rounded-none"
-          >
-            {saving ? 'Creating…' : 'Start scanning →'}
-          </Button>
-
-          {/* Skip — abort discovery, proceed with whatever arrived so far */}
-          {discoverLoading && !discoverDone && (
-            <button
+          {/* CTA — always visible at the bottom */}
+          <div className="shrink-0 pt-4">
+            {error && <p className="text-destructive mb-3 text-xs">{error}</p>}
+            <Button
               type="button"
-              onClick={() => {
-                abortRef.current?.abort();
-                setDiscoverLoading(false);
-                setDiscoverDone(true);
-              }}
-              className="text-muted-foreground/40 hover:text-muted-foreground mt-3 w-full font-mono text-xs transition-colors"
+              onClick={handleStartScanning}
+              disabled={saving || (!discoverDone && discoverLoading)}
+              className="w-full rounded-none"
             >
-              Skip source discovery →
-            </button>
-          )}
+              {saving
+                ? 'Creating…'
+                : discoverLoading && !discoverDone
+                  ? 'Finding sources…'
+                  : 'Start scanning →'}
+            </Button>
+            {discoverLoading && !discoverDone && (
+              <button
+                type="button"
+                onClick={() => {
+                  abortRef.current?.abort();
+                  setDiscoverLoading(false);
+                  setDiscoverDone(true);
+                }}
+                className="text-muted-foreground/40 hover:text-muted-foreground mt-3 w-full font-mono text-xs transition-colors"
+              >
+                Skip source discovery →
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );

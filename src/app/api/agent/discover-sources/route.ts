@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createRouteLogger } from '@/lib/route-logger';
-import { withTimeout, WEB_SEARCH_TIMEOUT_MS } from '@/lib/agent-guard';
+import { timedAbort, DISCOVER_TIMEOUT_MS } from '@/lib/agent-guard';
+import { logTokenCost } from '@/lib/cost';
 
 const log = createRouteLogger('agent-discover-sources');
 
@@ -149,41 +150,43 @@ export async function POST(req: Request): Promise<Response> {
       }
 
       inFlightDiscovery.add(flightKey);
+      const { signal: callSignal, clear: clearCall } = timedAbort(
+        DISCOVER_TIMEOUT_MS,
+        streamAbort.signal
+      );
       try {
         const hasSubreddits = existing_subreddits && existing_subreddits.length > 0;
         log.info(ctx.reqId, 'Discovering sources', { market_name, hasSubreddits });
 
-        const message = await withTimeout(
-          client.messages.create(
-            {
-              model: 'claude-sonnet-4-6',
-              max_tokens: 2048,
-              // When subreddits already known: only need 2-3 searches for G2/Capterra. Otherwise 5.
-              tools: [
-                {
-                  name: 'web_search',
-                  type: 'web_search_20260209' as const,
-                  max_uses: hasSubreddits ? 3 : 5,
-                },
-              ],
-              messages: [
-                {
-                  role: 'user',
-                  content: buildPrompt(
-                    market_name.trim(),
-                    micro_niche.trim(),
-                    description?.trim(),
-                    existing_subreddits
-                  ),
-                },
-              ],
-            },
-            { signal: streamAbort.signal }
-          ),
-          WEB_SEARCH_TIMEOUT_MS
+        const message = await client.messages.create(
+          {
+            model: 'claude-sonnet-4-6',
+            max_tokens: 2048,
+            // 3 searches without known subreddits (~54s), 2 with them (~36s) — fits in 90s timeout
+            tools: [
+              {
+                name: 'web_search',
+                type: 'web_search_20260209' as const,
+                max_uses: hasSubreddits ? 2 : 3,
+              },
+            ],
+            messages: [
+              {
+                role: 'user',
+                content: buildPrompt(
+                  market_name.trim(),
+                  micro_niche.trim(),
+                  description?.trim(),
+                  existing_subreddits
+                ),
+              },
+            ],
+          },
+          { signal: callSignal }
         );
 
         // Extract text blocks from response (may have tool_use blocks interspersed)
+        logTokenCost(ctx.reqId, 'discover', message.usage);
         const textBlocks = message.content.filter((b) => b.type === 'text');
         const fullText = textBlocks.map((b) => b.text).join('\n');
         const sources = parseSourceLines(fullText);
@@ -201,6 +204,7 @@ export async function POST(req: Request): Promise<Response> {
         log.err(ctx, error);
         flush({ type: 'error', message: 'Source discovery failed' });
       } finally {
+        clearCall();
         inFlightDiscovery.delete(flightKey);
       }
 

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { OnboardContent } from './page-content';
+import { OnboardClient } from './onboard-client';
 import { site } from '@/config/site';
 
 export const metadata: Metadata = {
@@ -15,5 +15,5 @@ export const metadata: Metadata = {
 };
 
 export default function OnboardPage() {
-  return <OnboardContent />;
+  return <OnboardClient />;
 }

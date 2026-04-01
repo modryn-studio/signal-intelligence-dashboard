@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { sql } from '@/lib/db';
 import { createRouteLogger } from '@/lib/route-logger';
-import { withTimeout, AGENT_TIMEOUT_MS, WEB_SEARCH_TIMEOUT_MS } from '@/lib/agent-guard';
+import { timedAbort, AGENT_TIMEOUT_MS, WEB_SEARCH_TIMEOUT_MS } from '@/lib/agent-guard';
 
 import { getTodayQuestion } from '@/lib/utils';
 
@@ -171,20 +171,19 @@ or
 or
 {"ref":${signal.id},"recommendation":"delete","reasoning":"one sentence"}`;
 
+  const timeoutMs = signal.content ? AGENT_TIMEOUT_MS : WEB_SEARCH_TIMEOUT_MS;
+  const { signal: callSignal, clear } = timedAbort(timeoutMs, reqSignal);
   try {
-    const message = await withTimeout(
-      client.messages.create(
-        {
-          model: 'claude-sonnet-4-6',
-          max_tokens: 512,
-          tools: signal.content
-            ? []
-            : [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
-          messages: [{ role: 'user', content: prompt }],
-        },
-        { signal: reqSignal }
-      ),
-      signal.content ? AGENT_TIMEOUT_MS : WEB_SEARCH_TIMEOUT_MS
+    const message = await client.messages.create(
+      {
+        model: 'claude-sonnet-4-6',
+        max_tokens: 512,
+        tools: signal.content
+          ? []
+          : [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
+        messages: [{ role: 'user', content: prompt }],
+      },
+      { signal: callSignal }
     );
 
     const lastText = [...message.content].reverse().find((b) => b.type === 'text');
@@ -225,6 +224,8 @@ or
       recommendation: 'skip',
       reasoning: 'Evaluation failed for this signal.',
     };
+  } finally {
+    clear();
   }
 }
 
@@ -299,7 +300,12 @@ export async function POST(req: Request): Promise<Response> {
           await Promise.all(
             batch.map(async (s) => {
               const content = await fetchContent(s);
-              const result = await evaluateOne(client, { ...s, content }, question, streamAbort.signal);
+              const result = await evaluateOne(
+                client,
+                { ...s, content },
+                question,
+                streamAbort.signal
+              );
               if (result) {
                 evaluations.push(result);
                 flush({ type: 'result', evaluation: result });
@@ -343,20 +349,19 @@ Use web_search once only if you need to confirm whether a dominant solution exis
 Respond with ONLY valid JSON, no markdown:
 {"priority_ids":[1,3],"priority":"...","patterns":"...","thesis_candidate":"..."}`;
 
+          const { signal: synthSignal, clear: clearSynth } = timedAbort(
+            WEB_SEARCH_TIMEOUT_MS,
+            streamAbort.signal
+          );
           try {
-            const synthMsg = await withTimeout(
-              client.messages.create(
-                {
-                  model: 'claude-sonnet-4-6',
-                  max_tokens: 512,
-                  tools: [
-                    { name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 },
-                  ],
-                  messages: [{ role: 'user', content: synthPrompt }],
-                },
-                { signal: streamAbort.signal }
-              ),
-              WEB_SEARCH_TIMEOUT_MS
+            const synthMsg = await client.messages.create(
+              {
+                model: 'claude-sonnet-4-6',
+                max_tokens: 512,
+                tools: [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
+                messages: [{ role: 'user', content: synthPrompt }],
+              },
+              { signal: synthSignal }
             );
             const lastText = [...synthMsg.content].reverse().find((b) => b.type === 'text');
             const rawText = lastText?.type === 'text' ? lastText.text.trim() : '{}';
@@ -368,6 +373,8 @@ Respond with ONLY valid JSON, no markdown:
             flush({ type: 'synthesis', synthesis });
           } catch {
             // Synthesis failure is non-fatal — cards are already rendered
+          } finally {
+            clearSynth();
           }
         }
 

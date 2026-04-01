@@ -1,5 +1,6 @@
 ﻿import Anthropic from '@anthropic-ai/sdk';
 import { createRouteLogger } from '@/lib/route-logger';
+import { logTokenCost } from '@/lib/cost';
 
 const log = createRouteLogger('agent-excavate');
 
@@ -10,10 +11,10 @@ interface MarketOption {
   niche: string;
   micro_niche: string;
   market_name: string;
-  price_range: string;
   demand: 'proven' | 'growing' | 'crowded';
   description: string;
-  reasoning?: string;
+  top_pick: boolean;
+  top_pick_reason: string;
   recommended_sources: { source_type: string; value: string }[];
 }
 
@@ -26,13 +27,6 @@ interface ExcavateBody {
 
 export type ExcavateChunk =
   | { type: 'market'; data: MarketOption }
-  | {
-      type: 'update';
-      data: Pick<
-        MarketOption,
-        'market_name' | 'price_range' | 'demand' | 'recommended_sources' | 'reasoning'
-      >;
-    }
   | { type: 'done' }
   | { type: 'error'; message: string };
 
@@ -86,11 +80,16 @@ function parseMarketLines(text: string): MarketOption[] {
 
 // â”€â”€ Prompts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const STUB_LINE = `{"overall_market":"...","niche":"...","micro_niche":"...","market_name":"...","price_range":"$29-149/mo","demand":"proven|growing|crowded","description":"...","recommended_sources":[]}`;
+const STUB_LINE = `{"overall_market":"...","niche":"...","micro_niche":"...","market_name":"...","demand":"proven|growing|crowded","description":"...","top_pick":false,"top_pick_reason":"","recommended_sources":[]}`;
 
-// NOTE: micro_niche is still in the type for downstream use, but the stub prompt
-// no longer asks Claude to target it precisely. It gets a broad "who + frustration"
-// and the real micro niche emerges from the signal feed over time.
+// Criteria for the single top-pick recommendation — used in both stub and steer prompts.
+// Ranked priority chain so Claude has a clear tiebreaker rather than a combined AND filter.
+const TOP_PICK_CRITERIA = `Mark exactly one card as top_pick: true using this ranked priority:
+1. Is someone clearly paying for something broken right now? (strongest signal — proven willingness to pay with visible frustration)
+2. Is this maintainable by one person without enterprise sales, compliance requirements, credentials, or large infrastructure?
+3. Is the sub-segment specific enough that a solo developer could realistically become the go-to solution for this exact person?
+Apply them in order: #1 is the primary filter, #2 eliminates candidates that require a team to serve, #3 is the tiebreaker between what remains.
+Also set top_pick_reason to one plain sentence explaining the pick — Claude showing its work, not a sales pitch. Example: "These people already pay for tools that don't solve the core problem — the gap is specific and reachable solo." Set top_pick: false and top_pick_reason: "" on the other three.`;
 
 function stubPrompt(interestSummary: string): string {
   return `You are helping a solo developer choose which market to research.
@@ -104,9 +103,8 @@ Generate exactly 4 DISTINCT market segments. Each must describe:
 - niche: a specific segment within it (e.g. "Independent Restaurant Owners", "Freelance Designers")
 - micro_niche: the person and their core frustration in one phrase (e.g. "Independent restaurant owners frustrated by food cost visibility")
 - market_name: 2-4 words naming the PERSON, not a product (e.g. "Independent Restaurant Owners", "Food Truck Operators", "Freelance Designers"). This is the card headline.
-- price_range: realistic estimate of what these people already pay for tools in this space, based on your training data. Use a range like "$19-79/mo". Enrich will verify with web search.
 - demand: 'proven' = multiple paid tools exist | 'growing' = market exists, tools still maturing | 'crowded' = saturated, hard to differentiate
-- description: 1-2 sentences describing who these people are, what they currently pay for, and why existing solutions frustrate them. No product suggestions.
+- description: 1-2 sentences on who these people are and why existing solutions frustrate them. No product suggestions. No pricing.
 
 Rules:
 - Do NOT suggest product ideas, tool names, or solution concepts. Describe the market, not what to build.
@@ -114,23 +112,10 @@ Rules:
 - The description should make the reader think "yes, these are my people" — not "here's what I should build."
 - Each market should feel like a door you walk through, not a destination.
 
+${TOP_PICK_CRITERIA}
+
 Output each market as a JSON object on its own line (NDJSON). Nothing else:
 ${STUB_LINE}`;
-}
-
-function enrichPrompt(market: MarketOption): string {
-  return `Research this market segment for a solo developer:
-
-Market: ${market.market_name}
-Who they are: ${market.micro_niche}
-
-Use web_search to find:
-1. Real tools these people currently pay for in this space. Find actual pricing (not guesses). Update price_range to reflect what they already spend (e.g. "$29–149/mo"). Name 2–3 specific products in the reasoning field.
-2. 2–4 active subreddits where these people (not developers, not founders) vent, ask for help, or discuss their problems. Verify each subreddit exists and is active. Exclude: r/SaaS, r/Entrepreneur, r/startups, r/indiehackers.
-3. Update demand to 'proven' if you found multiple paid tools with clear pricing, 'crowded' if the space is saturated, 'growing' if tools exist but market is still developing.
-
-Output a single JSON object on one line with your findings. Include a brief reasoning field that names specific competing products and their prices:
-{"market_name":"${market.market_name}","price_range":"...","demand":"proven|growing|crowded","recommended_sources":[{"source_type":"subreddit","value":"..."}],"reasoning":"..."}`;
 }
 
 function steerPrompt(
@@ -153,7 +138,9 @@ They want to refine. ${steerContext}
 
 Generate 4 NEW distinct market segments. Each market_name must be the PERSON or GROUP (e.g. "Food Truck Operators"), never a product name. Description should cover who they are, what they pay for, and what frustrates them. No product suggestions.
 
-Use your knowledge for price_range. Same format, one JSON object per line:
+${TOP_PICK_CRITERIA}
+
+Same format, one JSON object per line:
 ${STUB_LINE}`;
 }
 
@@ -220,6 +207,7 @@ export async function POST(req: Request): Promise<Response> {
             },
             { signal: streamAbort.signal }
           );
+          logTokenCost(ctx.reqId, 'steer', msg.usage);
           const text = msg.content.find((b) => b.type === 'text')?.text?.trim() ?? '';
           const markets = parseMarketLines(text);
           if (markets.length === 0) {
@@ -248,12 +236,13 @@ export async function POST(req: Request): Promise<Response> {
         const stubMsg = await client.messages.create(
           {
             model: 'claude-sonnet-4-6',
-            max_tokens: 2048,
+            max_tokens: 1024, // 4 market JSON objects ≈ 600–800 tokens
             messages: [{ role: 'user', content: stubPrompt(interestSummary) }],
           },
           { signal: streamAbort.signal }
         );
         const stubText = stubMsg.content.find((b) => b.type === 'text')?.text?.trim() ?? '';
+        logTokenCost(ctx.reqId, 'stub', stubMsg.usage);
         const stubs = parseMarketLines(stubText);
 
         if (stubs.length === 0) {
@@ -262,72 +251,10 @@ export async function POST(req: Request): Promise<Response> {
           return;
         }
 
-        // Stream stubs immediately -- user sees cards now
+        // Stream cards immediately — training data is sufficient for the picking decision.
+        // Source verification (G2, Capterra, subreddits) happens in discover-sources on screen 3.
         for (const m of stubs) flush({ type: 'market', data: m });
-
-        // Enrich phase: 4 parallel web-search calls, one per market
-        // inFlight dedup: if same key already enriching, skip new request entirely.
-        // This prevents N back-clicks from spawning N x 4 Claude web_search calls.
-        log.info(ctx.reqId, 'Enrich phase -- 4 parallel calls');
-        const enriched = [...stubs];
-        const ENRICH_TIMEOUT_MS = 45_000;
-
-        if (inFlight.has(key)) {
-          log.info(ctx.reqId, 'Enrich skipped -- already in-flight for key');
-          flush({ type: 'done' });
-          controller.close();
-          return;
-        }
-
-        const enrichRun = Promise.allSettled(
-          stubs.map(async (stub, i) => {
-            try {
-              const enrichCall = client.messages.create(
-                {
-                  model: 'claude-sonnet-4-6',
-                  max_tokens: 2048,
-                  tools: [
-                    { name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 },
-                  ],
-                  messages: [{ role: 'user', content: enrichPrompt(stub) }],
-                },
-                { signal: streamAbort.signal }
-              );
-              const timeoutP = new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error('enrich timeout')), ENRICH_TIMEOUT_MS)
-              );
-              const msg = await Promise.race([enrichCall, timeoutP]);
-              const text =
-                [...msg.content]
-                  .reverse()
-                  .find((b) => b.type === 'text')
-                  ?.text?.trim() ?? '';
-              const lines = text.split('\n').filter((l) => l.trim().startsWith('{'));
-              for (const line of lines) {
-                try {
-                  const update = JSON.parse(line) as Record<string, unknown>;
-                  if (update.market_name) {
-                    flush({
-                      type: 'update',
-                      data: update as ExcavateChunk extends { type: 'update'; data: infer D }
-                        ? D
-                        : never,
-                    });
-                    enriched[i] = { ...enriched[i], ...update };
-                  }
-                } catch {
-                  /* ignore non-JSON */
-                }
-              }
-            } catch (err) {
-              log.warn(ctx.reqId, `Enrich failed for market ${i}: ${String(err)}`);
-            }
-          })
-        ).finally(() => inFlight.delete(key));
-
-        inFlight.set(key, enrichRun as unknown as Promise<MarketOption[]>);
-        await enrichRun;
-        setToCache(key, enriched);
+        setToCache(key, stubs);
         flush({ type: 'done' });
       } catch (error) {
         log.err(ctx, error);
