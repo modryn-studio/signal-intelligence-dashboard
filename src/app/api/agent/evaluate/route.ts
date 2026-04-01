@@ -177,10 +177,10 @@ or
     const message = await client.messages.create(
       {
         model: 'claude-sonnet-4-6',
-        max_tokens: 512,
-        tools: signal.content
-          ? []
-          : [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
+        max_tokens: 1024,
+        ...(signal.content
+          ? {}
+          : { tools: [{ name: 'web_search', type: 'web_search_20250305' as const, max_uses: 1 }] }),
         messages: [{ role: 'user', content: prompt }],
       },
       { signal: callSignal }
@@ -344,21 +344,18 @@ Synthesize in one sentence per field. No hedging.
 - patterns: ≤20 words. Structural theme across observe cards. If none: "No clear pattern."
 - thesis_candidate: ≤25 words. A contrarian belief this data supports — something most would push back on. A belief about how a market is misconfigured, not a product idea.
 
-Use web_search once only if you need to confirm whether a dominant solution exists.
-
 Respond with ONLY valid JSON, no markdown:
 {"priority_ids":[1,3],"priority":"...","patterns":"...","thesis_candidate":"..."}`;
 
           const { signal: synthSignal, clear: clearSynth } = timedAbort(
-            WEB_SEARCH_TIMEOUT_MS,
+            AGENT_TIMEOUT_MS,
             streamAbort.signal
           );
           try {
             const synthMsg = await client.messages.create(
               {
                 model: 'claude-sonnet-4-6',
-                max_tokens: 512,
-                tools: [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 1 }],
+                max_tokens: 1024,
                 messages: [{ role: 'user', content: synthPrompt }],
               },
               { signal: synthSignal }

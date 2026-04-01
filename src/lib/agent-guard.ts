@@ -3,7 +3,6 @@
 
 export const AGENT_TIMEOUT_MS = 60_000; // 1 min — plain Claude calls
 export const WEB_SEARCH_TIMEOUT_MS = 45_000; // 45s — calls with 1 web_search use
-export const DISCOVER_TIMEOUT_MS = 90_000; // 90s — discover-sources (up to 5 web searches)
 
 /**
  * Creates an AbortSignal that fires after `ms` milliseconds AND whenever
@@ -44,17 +43,4 @@ export function timedAbort(
       }
     },
   };
-}
-
-/**
- * @deprecated Use timedAbort() instead. Promise.race does not cancel the
- * underlying Anthropic SDK call when the timeout fires — it keeps billing.
- */
-export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`Agent call timed out after ${ms}ms`)), ms)
-    ),
-  ]);
 }

@@ -68,6 +68,7 @@ export function DashboardHeader({ marketId }: { marketId?: number } = {}) {
   const { data: marketData, mutate: mutateMarket } = useSWR<{
     market: Market;
     sources: MarketSource[];
+    caps?: Record<string, string>;
   } | null>('/api/markets', fetcher, { refreshInterval: 0 });
   const { data: allMarkets, mutate: mutateAllMarkets } = useSWR<Market[]>(
     '/api/markets?all=1',
@@ -236,6 +237,7 @@ export function DashboardHeader({ marketId }: { marketId?: number } = {}) {
           onClose={() => setMarketConfigOpen(false)}
           market={marketData?.market ?? activeMarket}
           sources={marketData?.sources ?? []}
+          caps={marketData?.caps ?? {}}
           onUpdated={() => {
             void mutateMarket();
             void mutateAllMarkets();

@@ -195,9 +195,10 @@ interface SignalFeedProps {
   selectedDate: string;
   isToday: boolean;
   shiftDay: (delta: number) => void;
+  marketId?: number;
 }
 
-export function SignalFeed({ selectedDate, isToday, shiftDay }: SignalFeedProps) {
+export function SignalFeed({ selectedDate, isToday, shiftDay, marketId }: SignalFeedProps) {
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
   const todayQuestion = isToday ? getTodayQuestion() : getQuestionForDate(selectedDate);
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -237,12 +238,12 @@ export function SignalFeed({ selectedDate, isToday, shiftDay }: SignalFeedProps)
     const res = await fetch('/api/agent/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ today: selectedDate }),
+      body: JSON.stringify({ today: selectedDate, marketId }),
       signal,
     });
     if (!res.ok) throw new Error('Failed');
     const data = (await res.json()) as { logged: number };
-    mutate();
+    await mutate();
     return data;
   };
 

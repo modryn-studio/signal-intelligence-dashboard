@@ -1,5 +1,6 @@
 ﻿import Anthropic from '@anthropic-ai/sdk';
 import { createRouteLogger } from '@/lib/route-logger';
+import { timedAbort, AGENT_TIMEOUT_MS, WEB_SEARCH_TIMEOUT_MS } from '@/lib/agent-guard';
 import { logTokenCost } from '@/lib/cost';
 
 const log = createRouteLogger('agent-excavate');
@@ -19,7 +20,7 @@ interface MarketOption {
 }
 
 interface ExcavateBody {
-  tags: string[];
+  broadMarkets: string[];
   description?: string;
   steer?: string[];
   existingMarkets?: MarketOption[];
@@ -39,8 +40,8 @@ interface CacheEntry {
 }
 const marketCache = new Map<string, CacheEntry>();
 
-function cacheKey(tags: string[], description?: string): string {
-  return [...tags].sort().join(',') + '|' + (description?.trim().toLowerCase() ?? '');
+function cacheKey(broadMarkets: string[], description?: string): string {
+  return [...broadMarkets].sort().join(',') + '|' + (description?.trim().toLowerCase() ?? '');
 }
 
 function getFromCache(key: string): MarketOption[] | null {
@@ -88,8 +89,9 @@ const TOP_PICK_CRITERIA = `Mark exactly one card as top_pick: true using this ra
 1. Is someone clearly paying for something broken right now? (strongest signal — proven willingness to pay with visible frustration)
 2. Is this maintainable by one person without enterprise sales, compliance requirements, credentials, or large infrastructure?
 3. Is the sub-segment specific enough that a solo developer could realistically become the go-to solution for this exact person?
-Apply them in order: #1 is the primary filter, #2 eliminates candidates that require a team to serve, #3 is the tiebreaker between what remains.
-Also set top_pick_reason to one plain sentence explaining the pick — Claude showing its work, not a sales pitch. Example: "These people already pay for tools that don't solve the core problem — the gap is specific and reachable solo." Set top_pick: false and top_pick_reason: "" on the other three.`;
+4. Of the cards that survive criteria 1-3, which aligns most closely with the market the user showed the most specific language around in their original input?
+Apply them in order. Criterion 4 only breaks ties — but it's the signal that connects the pick to this specific person, not just to an abstract ideal.
+When writing top_pick_reason: reference something specific from the user's own words that supports the choice. If they mentioned a frustration, name it. If they described a habit or industry, connect to it. This is what makes the badge feel earned rather than mechanical. One plain sentence — Claude showing its work, not selling. Set top_pick: false and top_pick_reason: "" on the other three.`;
 
 function stubPrompt(interestSummary: string): string {
   return `You are helping a solo developer choose which market to research.
@@ -98,12 +100,16 @@ A "market" is a group of people who share a specific problem and already spend m
 
 ${interestSummary}
 
-Generate exactly 4 DISTINCT market segments. Each must describe:
+Generate exactly 4 DISTINCT market segments. Before assigning demand, use web_search to verify: do real paid tools exist for this niche, and is real user frustration visible in reviews or forums? Use 1-2 searches across the niches — prioritise niches you are uncertain about.
+
+IMPORTANT — if two broad markets are listed above: do NOT split cards evenly across each space. Instead, look for the person who lives at the intersection of both — someone whose daily work or life genuinely spans both worlds. All 4 cards should explore different sub-segments of that overlap. If only one broad market is listed: go deep within that single space.
+
+Each segment must describe:
 - overall_market: the broad world (e.g. "Restaurants", "Freelancers")
 - niche: a specific segment within it (e.g. "Independent Restaurant Owners", "Freelance Designers")
 - micro_niche: the person and their core frustration in one phrase (e.g. "Independent restaurant owners frustrated by food cost visibility")
 - market_name: 2-4 words naming the PERSON, not a product (e.g. "Independent Restaurant Owners", "Food Truck Operators", "Freelance Designers"). This is the card headline.
-- demand: 'proven' = multiple paid tools exist | 'growing' = market exists, tools still maturing | 'crowded' = saturated, hard to differentiate
+- demand: 'proven' = real paid tools exist AND real user frustration is visible right now | 'growing' = market exists, tools still maturing | 'crowded' = saturated, hard to differentiate
 - description: 1-2 sentences on who these people are and why existing solutions frustrate them. No product suggestions. No pricing.
 
 Rules:
@@ -114,7 +120,7 @@ Rules:
 
 ${TOP_PICK_CRITERIA}
 
-Output each market as a JSON object on its own line (NDJSON). Nothing else:
+Output each market as a JSON object on its own line (NDJSON). Nothing else — no explanation, no markdown:
 ${STUB_LINE}`;
 }
 
@@ -150,12 +156,12 @@ export async function POST(req: Request): Promise<Response> {
   const ctx = log.begin();
 
   const body = (await req.json().catch(() => ({}))) as ExcavateBody;
-  const { tags, description, steer, existingMarkets } = body;
+  const { broadMarkets, description, steer, existingMarkets } = body;
 
-  if (!tags?.length && !description?.trim()) {
+  if (!broadMarkets?.length && !description?.trim()) {
     return log.end(
       ctx,
-      Response.json({ error: 'tags or description is required' }, { status: 400 }),
+      Response.json({ error: 'broadMarkets or description is required' }, { status: 400 }),
       {}
     );
   }
@@ -169,7 +175,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const interestSummary = [
-    tags?.length ? `Selected interests: ${tags.join(', ')}` : null,
+    broadMarkets?.length ? `Confirmed broad markets: ${broadMarkets.join(', ')}` : null,
     description?.trim() ? `In their own words: "${description.trim()}"` : null,
   ]
     .filter(Boolean)
@@ -192,22 +198,33 @@ export async function POST(req: Request): Promise<Response> {
           /* client disconnected */
         }
       }
-
+      // Declared before outer try so catch can reference them on failure.
+      let key: string | undefined;
+      let rejectFlight: ((err: unknown) => void) | undefined;
       try {
         // â”€â”€ Steer path: cheap mutation, no web search (~5â€“10s) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (isSteer) {
           log.info(ctx.reqId, 'Steer path', { steer, existingCount: existingMarkets!.length });
-          const msg = await client.messages.create(
-            {
-              model: 'claude-sonnet-4-6',
-              max_tokens: 2048,
-              messages: [
-                { role: 'user', content: steerPrompt(interestSummary, existingMarkets!, steer!) },
-              ],
-            },
-            { signal: streamAbort.signal }
+          const { signal: steerSignal, clear: clearSteer } = timedAbort(
+            AGENT_TIMEOUT_MS,
+            streamAbort.signal
           );
-          logTokenCost(ctx.reqId, 'steer', msg.usage);
+          let msg: Awaited<ReturnType<typeof client.messages.create>>;
+          try {
+            msg = await client.messages.create(
+              {
+                model: 'claude-sonnet-4-6',
+                max_tokens: 2048,
+                messages: [
+                  { role: 'user', content: steerPrompt(interestSummary, existingMarkets!, steer!) },
+                ],
+              },
+              { signal: steerSignal }
+            );
+          } finally {
+            clearSteer();
+          }
+          logTokenCost(ctx.reqId, 'steer', msg.usage as Parameters<typeof logTokenCost>[2]);
           const text = msg.content.find((b) => b.type === 'text')?.text?.trim() ?? '';
           const markets = parseMarketLines(text);
           if (markets.length === 0) {
@@ -221,7 +238,8 @@ export async function POST(req: Request): Promise<Response> {
         }
 
         // â”€â”€ Cache hit: return immediately â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        const key = cacheKey(tags, description);
+        // ── Cache hit: return immediately ─────────────────────────────────
+        key = cacheKey(broadMarkets, description);
         const cached = getFromCache(key);
         if (cached) {
           log.info(ctx.reqId, 'Cache hit', { key, count: cached.length });
@@ -231,32 +249,75 @@ export async function POST(req: Request): Promise<Response> {
           return;
         }
 
-        // â”€â”€ Stub phase: fast generation, no web search (~5s) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        log.info(ctx.reqId, 'Stub phase', { tags, hasDescription: !!description });
-        const stubMsg = await client.messages.create(
-          {
-            model: 'claude-sonnet-4-6',
-            max_tokens: 1024, // 4 market JSON objects ≈ 600–800 tokens
-            messages: [{ role: 'user', content: stubPrompt(interestSummary) }],
-          },
-          { signal: streamAbort.signal }
-        );
-        const stubText = stubMsg.content.find((b) => b.type === 'text')?.text?.trim() ?? '';
-        logTokenCost(ctx.reqId, 'stub', stubMsg.usage);
-        const stubs = parseMarketLines(stubText);
-
-        if (stubs.length === 0) {
-          flush({ type: 'error', message: 'No markets generated â€” try again' });
+        // ── In-flight dedup: join an identical concurrent request ──────────────
+        // Prevents N tabs / double-clicks from each firing N × 2 web_search calls.
+        if (inFlight.has(key)) {
+          log.info(ctx.reqId, 'In-flight dedup', { key });
+          try {
+            const dedupStubs = await inFlight.get(key)!;
+            for (const m of dedupStubs) flush({ type: 'market', data: m });
+            flush({ type: 'done' });
+          } catch {
+            flush({ type: 'error', message: 'Excavation failed' });
+          }
           controller.close();
           return;
         }
 
-        // Stream cards immediately — training data is sufficient for the picking decision.
-        // Source verification (G2, Capterra, subreddits) happens in discover-sources on screen 3.
+        // rejectFlight assigned here — declared before outer try so catch can call it on failure
+        let resolveFlight!: (markets: MarketOption[]) => void;
+        const flightPromise = new Promise<MarketOption[]>((res, rej) => {
+          resolveFlight = res;
+          rejectFlight = rej;
+        });
+        inFlight.set(key, flightPromise);
+
+        // ── Stub phase: generation + up to 2 web searches for demand verification ──
+        log.info(ctx.reqId, 'Stub phase', { broadMarkets, hasDescription: !!description });
+        const { signal: callSignal, clear: clearCall } = timedAbort(
+          WEB_SEARCH_TIMEOUT_MS * 2, // 90s — allows up to 2 searches + generation
+          streamAbort.signal
+        );
+        let stubs: MarketOption[] = [];
+        try {
+          const stubMsg = await client.messages.create(
+            {
+              model: 'claude-sonnet-4-6',
+              max_tokens: 2048,
+              tools: [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 2 }],
+              messages: [{ role: 'user', content: stubPrompt(interestSummary) }],
+            },
+            { signal: callSignal }
+          );
+          logTokenCost(ctx.reqId, 'stub', stubMsg.usage as Parameters<typeof logTokenCost>[2]);
+          // Tool-use blocks may be interspersed — extract all text blocks
+          const stubText = stubMsg.content
+            .filter((b) => b.type === 'text')
+            .map((b) => (b as { type: 'text'; text: string }).text)
+            .join('\n')
+            .trim();
+          stubs = parseMarketLines(stubText);
+        } finally {
+          clearCall();
+        }
+
+        if (stubs.length === 0) {
+          rejectFlight?.(new Error('No markets'));
+          if (key) inFlight.delete(key);
+          flush({ type: 'error', message: 'No markets generated — try again' });
+          controller.close();
+          return;
+        }
+
+        resolveFlight(stubs);
+        inFlight.delete(key);
         for (const m of stubs) flush({ type: 'market', data: m });
         setToCache(key, stubs);
         flush({ type: 'done' });
       } catch (error) {
+        // Clean up any pending inFlight waiters so they do not hang forever.
+        rejectFlight?.(error);
+        if (key) inFlight.delete(key);
         log.err(ctx, error);
         flush({ type: 'error', message: 'Excavation failed' });
       }
@@ -272,6 +333,6 @@ export async function POST(req: Request): Promise<Response> {
   return log.end(
     ctx,
     new Response(stream, { headers: { 'Content-Type': 'application/x-ndjson' } }),
-    { isSteer, tags }
+    { isSteer, broadMarkets }
   );
 }

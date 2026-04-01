@@ -20,222 +20,21 @@ On mobile: tap the tabs at the bottom to switch columns.
 
 ---
 
-## First time? Start here.
-
-### Screen 1 — What are you into?
-
-You see 12 tags. Pick up to 3. Or just type something in the box below.
-
-Then click **Find my markets →**.
-
-Wait about 15 seconds. Cards will appear.
-
-### Screen 2 — Pick a market.
-
-You see 4 cards. Each one is a type of person with a type of problem.
-
-- The headline names the person. "Independent Restaurant Owners." "Freelance Video Editors."
-- The body describes what frustrates them and what they already pay for.
-- The price badge shows what people in this space spend on tools.
-- The demand badge says if it is proven, growing, or crowded.
-
-**Pick the one that feels most interesting to you.** You are not picking a product. You are picking a group of people to learn about. The product idea comes later.
-
-If you hate all 4: click **None of these feel right — let me refine ›**. Pick some steer tags. Click **Regenerate →**.
-
-### Screen 3 — Your signal sources.
-
-The app finds subreddits and review pages for your market. They show up one by one.
-
-All of them are toggled on by default. Turn off any you don't want.
-
-Click **Start scanning →**.
-
-That's it. You're in.
-
-> If it's taking forever, click **Skip source discovery →** at the bottom and move on.
-
----
-
-## Step 1 — Get some signals into the left column.
-
-You have two ways.
-
-### The fast way — run the agent.
-
-Click **Agent ⌄** at the top of the left column. Click **Run Agent**.
-
-Wait 15–30 seconds. The agent reads Hacker News, Product Hunt, Indie Hackers, Reddit, and your custom subreddits. It keeps only the stuff relevant to your market.
-
-When it's done, click **→ Deep evaluate**.
-
-### The manual way — log one yourself.
-
-Click **+ Log Input** at the top of the left column.
-
-Fill in:
-
-- **What did you find?** One sentence.
-- **Category** — Trends, Pain, Indie, or Raw.
-- **Source** — Reddit, HN, Twitter, wherever.
-- **URL** — paste the link. Optional.
-- **Notes** — why did this catch your eye? Write it now. You will forget.
-
-Click **Save**.
-
----
-
-## Step 2 — Evaluate the signals.
-
-Click **Agent ⌄** then **Evaluate**. Or click **→ Deep evaluate** after running the agent.
-
-Cards appear one by one. Each one gets a verdict:
-
-- **Observe** — real gap. Keep it.
-- **Skip** — mildly interesting. Ignore for now.
-- **Delete** — noise.
-
-At the top of the window, after all cards load, you see an **Analysis** section:
-
-- The strongest signals and why
-- The pattern across them
-- A thesis the data suggests
-
-Below that: **Accept top signals + form thesis**.
-
-Click it. Done. Your best observations are saved and a thesis is created automatically.
-
-Want to do it card by card instead? Click **Accept** on an Observe card to save it. Click **Delete card** to trash it.
-
----
-
-## Step 3 — Add an observation by hand.
-
-Don't want to use the agent? Fine.
-
-Hover any signal card. Click **→ Observe**.
-
-The form opens pre-filled. Fix the title and body if needed.
-
-- **Title** — describe the pattern. Not "founder complains on Reddit." More like "Stripe fees are killing bootstrapped apps."
-- **Body** — two sentences. What's happening and why it matters.
-
-Click **Save Observation**. It shows up in the middle column.
-
----
-
-## Step 4 — Turn observations into a thesis.
-
-Once you have 3 or more observations, a **Synthesize** button appears at the top of the middle column.
-
-Click it.
-
-The agent reads your observations and finds the pattern. It gives you:
-
-- A one-sentence thesis — a bold contrarian belief
-- Which observations back it up
-- A confidence level (1–5)
-- A short explanation
-
-If it looks right: click **Create thesis**. It appears in the right column.
-
-If it's wrong: click the **↺** button in the bottom-right to re-run.
-
-Want to write one yourself? Close the window and click **+ Form Thesis** at the top of the right column.
-
----
-
-## Step 5 — Validate the thesis.
-
-This is the most important step.
-
-You need proof that people already pay for something like this. Not a feeling. Evidence.
-
-Click **Validate →** at the top of the right column.
-
-The agent picks your first forming thesis and looks up competing products. It fills in the **Proven Market** field for you.
-
-You're looking for: 3–5 products that exist and charge money.
-
-> Example: "Vanta ($5k+/yr), Drata ($2k+/yr), Secureframe ($1k+/mo)"
-
-If the agent misses something, edit the field yourself. Click **↺ Re-research** if you want it to try again.
-
-When you're happy with it: click **Validate →**. The thesis moves from **Forming** to **Validated**.
-
----
-
-## Step 6 — Run the lifestyle filter.
-
-Validated theses still need one test: can you actually run this business alone?
-
-Click **Lifestyle →** at the top of the right column (switch to the **Validated** tab first).
-
-The agent scores your thesis against 5 filters:
-
-1. **Solo maintainable** — one person can run it
-2. **Recurring revenue day one** — makes money from the start _(must pass — this is a knockout)_
-3. **VC-ignored TAM** — small enough that you can win
-4. **Reachable first 20** — you can find your first customers without ads
-5. **Boring enough for 5 years** — you won't hate it in 2030
-
-You see ✓ or ✗ for each, with a one-line reason.
-
-Pass? Click **Accept →**. The thesis becomes a **Ready to Build** card.
-
-Fail? It tells you which filters failed. Click **↺ Re-analyze** to retry or check the boxes manually on the Validated thesis card.
-
----
-
-## Other things you can do.
-
-**Attach an observation to a thesis manually.** Hover an observation card. Click **Add to thesis**. Pick the thesis from the list.
-
-**Switch markets.** Click the orange market name in the header (the one next to the date). A dropdown opens. Click any market to switch.
-
-**Edit your market.** Same dropdown → **Edit sources & name**. You can rename it, update the description, or add/remove subreddits.
-
-**Go back to all markets.** Dropdown → **All markets**.
-
-**Start a new market.** Dropdown → **+ New market**. Takes you back to onboarding.
-
-Each market is completely separate. Signals in one market don't bleed into another.
-
----
-
-## Status
-
-| Feature                          | Status | Notes                                                             |
-| -------------------------------- | ------ | ----------------------------------------------------------------- |
-| Market onboarding (excavation)   | ✅     | 3 screens: interest tags → 4 market cards → sources review        |
-| Run Agent (signal fetch)         | ✅     | HN, PH, Indie Hackers, r/SaaS, r/Entrepreneur + custom subreddits |
-| Manual signal logging            | ✅     | + Log Input form                                                  |
-| Deep evaluate (streaming)        | ✅     | observe/skip/delete verdicts + synthesis block                    |
-| Add observation manually         | ✅     | Hover card → Observe, or + Capture                                |
-| Synthesize observations → thesis | ✅     | Requires ≥3 observations; cached per day                          |
-| Validate thesis (proven market)  | ✅     | Agent auto-researches; editable; cached per thesis                |
-| Lifestyle filter (agentic)       | ✅     | 5 filters; Q2 knockout; cached per thesis                         |
-| Lifestyle filter (manual)        | ✅     | 5 checkboxes inline on validated thesis card                      |
-| Ready to Build card              | ✅     | Shown when validated + lifestyle_pass = true                      |
-| Multi-market switching           | ✅     | Header dropdown; each is a separate workspace                     |
-| Stats (today / total / streak)   | ✅     | Scoped per market; shown in header                                |
-| Digest button                    | ⏳     | Disabled — requires Resend/SMTP env vars for actual delivery      |
-| Email signup                     | ✅     | Sends to /api/feedback; no confirmation email                     |
-| Mobile bottom tab nav            | ✅     | Signals / Observe / Theses tabs                                   |
-
----
-
 ## Step 1 — Define your market
 
 When you first open the app, you land on the onboarding screen.
 
 **Screen 1 — What are you into?**
 
-You will see a grid of 12 interest tags: freelance, dev tools, finance, e-commerce, fitness, real estate, creators, healthcare, legal, logistics, education, restaurants. Pick up to 3. Or skip the tags entirely and type a description in the field below the grid. You need at least one tag or some text to continue.
+You will see a row of suggestion chips and a freetext input. Type what you're into, what frustrates you, what you know well. Click any chips that apply. You need at least some text or a chip to continue.
 
 Click **Find my markets →**.
 
-You will see a full-screen loading state: "Finding your markets — Cards appear in about 15 seconds." A progress bar animates while the agent generates four market segments, then verifies pricing and finds subreddits for each in the background.
+**Screen 1b — Confirm your broad markets.**
+
+The app reads what you wrote and surfaces 2–4 broad market categories (e.g. “Trading & Investing”, “Health & Fitness”). These are big worlds your interests point toward. Pick the 1–2 that feel right, then click **Continue →**.
+
+You will see a full-screen loading state: "Checking live demand signals — usually takes 45–60 seconds." A progress bar animates while the agent generates four market segments and verifies demand signals.
 
 **Screen 2 — Pick the one that fits.**
 
@@ -257,7 +56,7 @@ Once you click a card, you move to Screen 3.
 
 **Screen 3 — Signal sources**
 
-The app finds the best subreddits and product review pages (G2, Capterra) for your market. Sources stream in as they are discovered. Each one has a toggle — they are all enabled by default.
+The app finds the best subreddits for your market. Sources stream in as they are discovered. Each one has a toggle — they are all enabled by default.
 
 Review the list. Toggle off anything you do not want the agent pulling from.
 
@@ -454,7 +253,7 @@ Each market is a separate workspace. Signals, observations, and theses in one ma
 
 | Feature                          | Status | Notes                                                                                                                |
 | -------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------- |
-| Market onboarding (excavation)   | ✅     | 3 screens: interest tags → 4 market cards → sources review (discover-sources streaming)                              |
+| Market onboarding (excavation)   | ✅     | 4 screens: interests → confirm broad markets → 4 market cards → sources review (discover-sources streaming)          |
 | Run Agent (signal fetch)         | ✅     | HN, PH, Indie Hackers, r/SaaS, r/Entrepreneur + custom subreddits                                                    |
 | Manual signal logging            | ✅     | + Log Input form                                                                                                     |
 | Deep evaluate (streaming)        | ✅     | observe/skip/delete verdicts + synthesis block                                                                       |

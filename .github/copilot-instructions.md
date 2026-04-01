@@ -32,7 +32,7 @@ basePath: (empty — standalone deployment)
 
 ```
 /app                    → Next.js App Router pages + API routes
-  /onboard              → Excavation onboarding (2-screen: tags → market picking)
+  /onboard              → Excavation onboarding (4-screen: interests → confirm broad markets → market picking → sources)
   /market/[id]          → Per-market dashboard — activates market on mount
   /api/markets          → CRUD markets + market_sources; self-migrates tables
   /api/inputs           → Signal inputs CRUD — market-scoped
@@ -58,7 +58,7 @@ schema.sql              → one-time Neon DB bootstrap (already run)
 ## Route Map
 
 - `/` → Market gate — fetches `/api/markets?all=1`; 0 markets → `/onboard`, 1 market → `/market/[id]`, 2+ → inline `<MarketPicker>` sorted by signal count; no localStorage flags
-- `/onboard` → Excavation onboarding — Screen 1: 12 interest tags (max 3) + freetext → ExcavateLoading (~15s stub, 30s ease-out progress bar) → Screen 2: 4 market cards with demand badges + inline steer refinement → Screen 3: signal sources review (discover-sources streaming) → selecting sources creates market + fires agent silently → `/market/[id]`
+- `/onboard` → Excavation onboarding — 4-step flow: **Screen 1** freetext + interest chips → `/api/agent/interpret` (~3s); **Screen 1b** confirm 2–4 broad market categories → `/api/agent/excavate` (ExcavateLoading, ~45–60s, 55s ease-out progress bar); **Screen 2** 4 market cards with demand badges + inline steer refinement (steer re-calls excavate without tools, fast); **Screen 3** discover-sources streams subreddits → "Start scanning →" creates market + fires agent silently with marketId → `/market/[id]`
 - `/market/[id]` → Per-market dashboard — PATCHes market active on mount (atomic SQL); renders `<DashboardHeader marketId={id}>` immediately, gates `<DashboardLayout>` behind PATCH completion
 - `/api/markets` → CRUD markets + market_sources; self-migrates tables at cold-start; PATCH activation is atomic single-statement (`is_active = (id = $id)`)
 - `/api/inputs` → CRUD for signal inputs — market-scoped via `getActiveMarketId()`
@@ -68,12 +68,13 @@ schema.sql              → one-time Neon DB bootstrap (already run)
 - `/api/digest` → POST `{ email }` — generates HTML digest scoped to active market; inserts to `email_digests`; requires Resend/SMTP env vars for actual delivery
 - `/api/feedback` → POST — feedback + newsletter signup
 - `/api/agent/run` → POST `{ today }` — market-aware: injects market name+description as focus filter; fetches HN, PH, Indie Hackers, r/SaaS, r/Entrepreneur + custom subreddits; Claude selects ~10 relevant; stamps `market_id`
-- `/api/agent/evaluate` → POST — streaming NDJSON; evaluates in batches of 5; fetches real source content (Reddit JSON, HN Algolia, article HTML); web_search conditional — skipped when content fetched (60s timeout), used as fallback (max 1 use, 45s) only when content empty; synthesis call has web_search available (max 1 use); cached in localStorage by date
-- `/api/agent/discover-sources` → POST `{ market_name, micro_niche, description?, existing_subreddits? }` — streaming NDJSON; Claude with web_search (3–5 uses); returns subreddits + G2/Capterra pages; in-flight dedup per market_name
+- `/api/agent/evaluate` → POST — streaming NDJSON; evaluates in batches of 5; fetches real source content (Reddit JSON, HN Algolia, article HTML); web_search conditional — skipped when content fetched (60s timeout), used as fallback (`web_search_20250305`, max 1 use, 45s) only when content empty; synthesis call has no tools (pure inference, 60s timeout); cached in localStorage by date
+- `/api/agent/discover-sources` → POST `{ market_name, micro_niche, description?, existing_subreddits? }` — streaming NDJSON; Claude with no tools (pure inference, 60s timeout, ~10s actual); returns subreddits; in-flight dedup per market_name
+- `/api/agent/interpret` → POST `{ text }` — Claude (no tools, 512 max_tokens) reads freetext, surfaces 2–4 broad market categories; streams `{type:'market', data:{market, reason}}` chunks; server-side 24h cache + client localStorage day-scoped cache
 - `/api/agent/propose` → POST — reads last 30 observations; Claude returns `{ thesis, supporting_observations, conviction_level, reasoning }`; cached by date
 - `/api/agent/validate` → POST `{ thesis }` — Claude (no web search) returns `{ proposed_proven_market }`; cached by thesis ID + date
 - `/api/agent/lifestyle` → POST `{ thesis, proven_market }` — Claude scores 5 filters; Q2 (recurring revenue) is knockout; returns `{ questions, overall_pass }`; cached by thesis ID + date
-- `/api/agent/excavate` → POST `{ tags, description?, steer? }` — Claude with `web_search_20260209` returns 4 market options with demand badge, price range, sources
+- `/api/agent/excavate` → POST `{ broadMarkets: string[], description?, steer?, existingMarkets? }` — normal path: Claude with `web_search_20260209` (max 2 uses, ~$0.15, ~45–60s) returns 4 market cards with demand badge, price range, top_pick; steer path: no tools, fast, not cached
 
 ## Brand & Voice
 

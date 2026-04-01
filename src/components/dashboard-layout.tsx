@@ -15,7 +15,7 @@ const TABS = [
   { id: 'theses', label: 'Theses', icon: Target },
 ] as const;
 
-export function DashboardLayout() {
+export function DashboardLayout({ marketId }: { marketId?: number }) {
   const [activeTab, setActiveTab] = useState<Tab>('signals');
   const today = localDateStr();
   const [selectedDate, setSelectedDate] = useState(today);
@@ -33,7 +33,12 @@ export function DashboardLayout() {
       {/* ── Desktop: 3-column grid ── */}
       <div className="divide-border hidden h-full lg:grid lg:grid-cols-[1fr_1fr_1fr] lg:divide-x">
         <section className="bg-column-flank flex h-full flex-col overflow-hidden p-5">
-          <SignalFeed selectedDate={selectedDate} isToday={isToday} shiftDay={shiftDay} />
+          <SignalFeed
+            selectedDate={selectedDate}
+            isToday={isToday}
+            shiftDay={shiftDay}
+            marketId={marketId}
+          />
         </section>
         <section className="flex h-full flex-col overflow-hidden p-5">
           <ObservationsPanel />
@@ -48,7 +53,12 @@ export function DashboardLayout() {
         {/* Active panel */}
         <div className="flex-1 overflow-hidden p-4">
           {activeTab === 'signals' && (
-            <SignalFeed selectedDate={selectedDate} isToday={isToday} shiftDay={shiftDay} />
+            <SignalFeed
+              selectedDate={selectedDate}
+              isToday={isToday}
+              shiftDay={shiftDay}
+              marketId={marketId}
+            />
           )}
           {activeTab === 'observations' && <ObservationsPanel />}
           {activeTab === 'theses' && <ContrarianTruthsPanel />}

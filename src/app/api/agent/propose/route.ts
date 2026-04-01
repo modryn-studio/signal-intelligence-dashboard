@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { sql } from '@/lib/db';
 import { createRouteLogger } from '@/lib/route-logger';
-import { withTimeout, AGENT_TIMEOUT_MS } from '@/lib/agent-guard';
+import { timedAbort, AGENT_TIMEOUT_MS } from '@/lib/agent-guard';
 
 const log = createRouteLogger('agent-propose');
 
@@ -70,17 +70,20 @@ If the observations are too scattered to form a coherent belief, return thesis: 
 Respond with ONLY valid JSON, no markdown:
 {"thesis":"...","supporting_observation_ids":[1,2,3],"conviction_level":2,"reasoning":"..."}`;
 
-    const message = await withTimeout(
-      client.messages.create(
+    const { signal: callSignal, clear } = timedAbort(AGENT_TIMEOUT_MS, signal);
+    let message: Anthropic.Message;
+    try {
+      message = await client.messages.create(
         {
           model: 'claude-sonnet-4-6',
           max_tokens: 512,
           messages: [{ role: 'user', content: prompt }],
         },
-        { signal }
-      ),
-      AGENT_TIMEOUT_MS
-    );
+        { signal: callSignal }
+      );
+    } finally {
+      clear();
+    }
 
     const text = message.content.find((b) => b.type === 'text')?.text.trim() ?? '{}';
     const raw = text

@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createRouteLogger } from '@/lib/route-logger';
-import { withTimeout, AGENT_TIMEOUT_MS } from '@/lib/agent-guard';
+import { timedAbort, AGENT_TIMEOUT_MS } from '@/lib/agent-guard';
 
 const log = createRouteLogger('agent-lifestyle');
 
@@ -43,8 +43,10 @@ export async function POST(request: Request): Promise<Response> {
 
     log.info(ctx.reqId, 'Assessing lifestyle fit', { thesis: thesis.slice(0, 80) });
 
-    const message = await withTimeout(
-      client.messages.create(
+    const { signal: callSignal, clear } = timedAbort(AGENT_TIMEOUT_MS, signal);
+    let message: Anthropic.Message;
+    try {
+      message = await client.messages.create(
         {
           model: 'claude-sonnet-4-6',
           max_tokens: 1024,
@@ -81,10 +83,11 @@ Respond ONLY with valid JSON, no explanation, no markdown:
             },
           ],
         },
-        { signal }
-      ),
-      AGENT_TIMEOUT_MS
-    );
+        { signal: callSignal }
+      );
+    } finally {
+      clear();
+    }
 
     log.info(ctx.reqId, 'Claude response', {
       stop_reason: message.stop_reason,

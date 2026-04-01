@@ -3,9 +3,10 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { localDateStr } from '@/lib/utils';
 import type { ExcavateChunk } from '@/app/api/agent/excavate/route';
+import type { InterpretChunk, BroadMarket } from '@/app/api/agent/interpret/route';
 import type {
   DiscoveredSource,
   DiscoverSourcesChunk,
@@ -27,9 +28,10 @@ interface DiscoverCacheEntry {
 
 const EXCAVATE_CACHE_KEY = 'excavate-cache';
 const DISCOVER_CACHE_KEY = 'discover-sources-cache';
+const INTERPRET_CACHE_KEY = 'interpret-cache';
 
-function excavateCacheKey(tags: string[], description?: string) {
-  return [...tags].sort().join(',') + '|' + (description?.trim().toLowerCase() ?? '');
+function excavateCacheKey(broadMarkets: string[], freeText?: string) {
+  return [...broadMarkets].sort().join(',') + '|' + (freeText?.trim().toLowerCase() ?? '');
 }
 
 function readExcavateCache(key: string): MarketOption[] | null {
@@ -76,14 +78,44 @@ function writeDiscoverCache(marketKey: string, sources: DiscoveredSource[]) {
   }
 }
 
+// ── Interpret cache ────────────────────────────────────────────────────────
+
+interface InterpretCacheEntry {
+  cacheKey: string;
+  markets: BroadMarket[];
+  date: string;
+}
+
+function readInterpretCache(key: string): BroadMarket[] | null {
+  try {
+    const raw = localStorage.getItem(INTERPRET_CACHE_KEY);
+    if (!raw) return null;
+    const entry = JSON.parse(raw) as InterpretCacheEntry;
+    return entry.date === localDateStr() && entry.cacheKey === key ? entry.markets : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeInterpretCache(key: string, markets: BroadMarket[]) {
+  try {
+    localStorage.setItem(
+      INTERPRET_CACHE_KEY,
+      JSON.stringify({ cacheKey: key, markets, date: localDateStr() })
+    );
+  } catch {
+    /* storage full — skip */
+  }
+}
+
 // ── Session persistence ────────────────────────────────────────────────────
 // Survives refresh. The excavate + discover caches are date-scoped, so a new
 // day automatically falls back to screen 1 without any extra expiry logic.
 
 interface OnboardSession {
   step: Step;
-  selectedTags: string[];
   freeText: string;
+  confirmedBroadMarkets: string[];
   selectedMarketIndex: number | null;
 }
 
@@ -117,19 +149,24 @@ function clearSession() {
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const INTEREST_TAGS = [
-  'freelance',
-  'dev tools',
-  'finance',
-  'e-commerce',
-  'fitness',
-  'real estate',
-  'creators',
-  'healthcare',
-  'legal',
-  'logistics',
-  'education',
-  'restaurants',
+const SUGGESTION_CHIPS = [
+  'Finance',
+  'Health & Fitness',
+  'Real Estate',
+  'Education',
+  'Creator Economy',
+  'Productivity',
+  'E-commerce',
+  'Mental Health',
+  'Gaming',
+  'Food & Nutrition',
+] as const;
+
+const PROMPTS = [
+  'What do you spend time on outside of work?',
+  'What\u2019s something you\u2019ve complained about recently?',
+  'What YouTube rabbit holes do you fall into?',
+  'What\u2019s something you know more about than most people?',
 ] as const;
 
 const STEER_TAGS = [
@@ -141,6 +178,19 @@ const STEER_TAGS = [
   'B2B focus',
   'more underserved',
   'completely different',
+] as const;
+
+// Always-visible single-tap steer chips on Screen 2
+const QUICK_STEER_CHIPS = ['more niche', 'more proven', 'completely different'] as const;
+
+// Extended options behind "more options →" — excludes quick chips
+const EXTENDED_STEER_TAGS = [
+  'more technical',
+  'different industry',
+  'I use this daily',
+  'show me boring markets',
+  'B2B focus',
+  'more underserved',
 ] as const;
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -159,7 +209,7 @@ type MarketOption = {
   recommended_sources: { source_type: string; value: string }[];
 };
 
-type Step = 'interests' | 'picking' | 'sources';
+type Step = 'interests' | 'confirm-broad' | 'picking' | 'sources';
 
 // ── Sub-components ─────────────────────────────────────────────────────────
 
@@ -197,7 +247,11 @@ function MarketCard({
       onClick={onSelect}
       disabled={disabled}
       className={`bg-card w-full rounded border p-4 text-left transition-colors disabled:pointer-events-none disabled:opacity-50 ${
-        selected ? 'border-primary ring-primary/20 ring-2' : 'border-border hover:border-primary/50'
+        selected
+          ? 'border-primary ring-primary/20 ring-2'
+          : market.top_pick
+            ? 'border-primary/40 hover:border-primary/70'
+            : 'border-border hover:border-primary/50'
       }`}
     >
       {/* Breadcrumb */}
@@ -217,13 +271,15 @@ function MarketCard({
           {demand.label}
         </span>
         {market.top_pick && (
-          <span className="text-primary rounded border border-(--color-primary) px-1.5 py-0.5 font-mono text-[10px]">
+          <span className="bg-primary/10 text-primary border-primary/40 rounded border px-1.5 py-0.5 font-mono text-[10px] font-medium">
             best fit
           </span>
         )}
       </div>
       {market.top_pick && market.top_pick_reason && (
-        <p className="text-primary/70 mt-2 text-[11px] leading-snug">{market.top_pick_reason}</p>
+        <p className="text-primary/70 border-primary/30 mt-2 border-l-2 pl-2 text-[11px] leading-snug">
+          {market.top_pick_reason}
+        </p>
       )}
     </button>
   );
@@ -246,29 +302,30 @@ function SkeletonCard() {
 // ── Excavate loading screen ──────────────────────────────────────────
 
 function ExcavateLoading({ onCancel }: { onCancel: () => void }) {
-  const [wide, setWide] = useState(false);
+  const [progress, setProgress] = useState(0);
+
   useEffect(() => {
-    const t = setTimeout(() => setWide(true), 50);
-    return () => clearTimeout(t);
+    // Kick off after one frame so the transition fires
+    const id = requestAnimationFrame(() => setProgress(90));
+    return () => cancelAnimationFrame(id);
   }, []);
+
   return (
     <div className="bg-background text-foreground flex min-h-svh flex-col items-center justify-center px-4 sm:px-6">
       <div className="w-full max-w-sm">
         <p className="text-primary font-mono text-[10px] tracking-widest uppercase">
           Signal Intelligence
         </p>
-        <h2 className="text-foreground mt-4 text-xl font-semibold">Finding your markets</h2>
-        <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-          Researching four market segments.
-          <br />
-          Cards appear in about 15 seconds.
+        <h2 className="text-foreground mt-4 text-xl font-semibold">Digging into your markets…</h2>
+        <p className="text-muted-foreground mt-2 text-sm">
+          Checking live demand signals — usually takes 45–60 seconds.
         </p>
         <div className="bg-border/50 mt-8 h-px w-full overflow-hidden">
           <div
             className="bg-primary h-full"
             style={{
-              width: wide ? '92%' : '0%',
-              transition: 'width 30s ease-out',
+              width: `${progress}%`,
+              transition: 'width 55s cubic-bezier(0.1, 0.05, 0.02, 1)',
             }}
           />
         </div>
@@ -287,8 +344,8 @@ function ExcavateLoading({ onCancel }: { onCancel: () => void }) {
 
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
   live: { label: 'live', className: 'text-emerald-500 border-emerald-500/40' },
-  fragile: { label: 'fragile', className: 'text-amber-500 border-amber-500/40' },
-  needs_api_key: { label: 'needs API key', className: 'text-muted-foreground border-border' },
+  fragile: { label: 'limited access', className: 'text-amber-500 border-amber-500/40' },
+  needs_api_key: { label: 'requires setup', className: 'text-muted-foreground border-border' },
   inactive: { label: 'inactive', className: 'text-muted-foreground/50 border-border/50' },
 };
 
@@ -328,6 +385,11 @@ function SourceCard({
           <span className="text-foreground text-sm font-medium">{source.display_name}</span>
           <span
             className={`rounded border px-1.5 py-0.5 font-mono text-[10px] ${status.className}`}
+            title={
+              source.status === 'needs_api_key'
+                ? 'This source needs an API key to pull data — skip it for now or set one up later.'
+                : undefined
+            }
           >
             {status.label}
           </span>
@@ -365,15 +427,22 @@ export function OnboardContent() {
   const router = useRouter();
 
   const [step, setStep] = useState<Step>('interests');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [freeText, setFreeText] = useState('');
+  const [promptIndex, setPromptIndex] = useState(() => Math.floor(Math.random() * PROMPTS.length));
   const [markets, setMarkets] = useState<MarketOption[]>([]);
+  const [originalMarkets, setOriginalMarkets] = useState<MarketOption[] | null>(null);
   const [selectedSteer, setSelectedSteer] = useState<string[]>([]);
   const [steerExpanded, setSteerExpanded] = useState(false);
-  const [loading, setLoading] = useState(false); // full-screen loader (Phase 1 in flight)
+  const [activeQuickSteer, setActiveQuickSteer] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false); // full-screen loader (excavate in flight)
   const [steerLoading, setSteerLoading] = useState(false); // dim cards during steer
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Screen 1b: broad market confirmation
+  const [interpretLoading, setInterpretLoading] = useState(false);
+  const [broadMarkets, setBroadMarkets] = useState<BroadMarket[]>([]);
+  const [confirmedBroadMarkets, setConfirmedBroadMarkets] = useState<string[]>([]);
 
   // Screen 2: select-then-confirm
   const [selectedMarketIndex, setSelectedMarketIndex] = useState<number | null>(null);
@@ -397,19 +466,34 @@ export function OnboardContent() {
   // Restore session before first paint — useLayoutEffect fires synchronously
   // before the browser paints, so the user never sees the wrong screen.
   // Safe to use here because page.tsx uses dynamic(..., { ssr: false }).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const s = readSession();
     if (!s) return;
 
-    setSelectedTags(s.selectedTags);
     setFreeText(s.freeText);
+    setConfirmedBroadMarkets(s.confirmedBroadMarkets ?? []);
     if (s.step === 'interests') return;
 
+    // Broad market confirmation step — restore interpret cache
+    if (s.step === 'confirm-broad') {
+      const key = s.freeText.trim().toLowerCase();
+      const cachedBroad = readInterpretCache(key);
+      if (cachedBroad?.length) {
+        setBroadMarkets(cachedBroad);
+        setStep('confirm-broad');
+      }
+      return;
+    }
+
     // Markets must still be in the day-scoped excavate cache
-    const key = excavateCacheKey(s.selectedTags, s.freeText);
+    const key = excavateCacheKey(s.confirmedBroadMarkets ?? [], s.freeText);
     const cachedMarkets = readExcavateCache(key);
-    if (!cachedMarkets?.length) return; // cache expired — stay on interests with tags restored
+    if (!cachedMarkets?.length) return; // cache expired — stay on interests with text restored
+
+    // Also restore broadMarkets so Back from Screen 2 → confirm-broad shows cards
+    const interpretKey = s.freeText.trim().toLowerCase();
+    const cachedBroad = readInterpretCache(interpretKey);
+    if (cachedBroad?.length) setBroadMarkets(cachedBroad);
 
     setMarkets(cachedMarkets);
     setSelectedMarketIndex(s.selectedMarketIndex);
@@ -427,19 +511,100 @@ export function OnboardContent() {
     }
 
     setStep('picking');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Persist session whenever navigation state changes
   useEffect(() => {
-    writeSession({ step, selectedTags, freeText, selectedMarketIndex });
-  }, [step, selectedTags, freeText, selectedMarketIndex]);
+    writeSession({ step, freeText, confirmedBroadMarkets, selectedMarketIndex });
+  }, [step, freeText, confirmedBroadMarkets, selectedMarketIndex]);
 
-  function toggleTag(tag: string) {
-    setSelectedTags((prev) => {
-      if (prev.includes(tag)) return prev.filter((t) => t !== tag);
-      if (prev.length >= 3) return prev; // max 3
-      return [...prev, tag];
+  function appendChip(chip: string) {
+    setFreeText((prev) => {
+      const trimmed = prev.trim();
+      if (!trimmed) return chip;
+      return trimmed + ', ' + chip;
     });
+  }
+
+  function toggleBroadMarket(market: string) {
+    setConfirmedBroadMarkets((prev) => {
+      if (prev.includes(market)) return prev.filter((m) => m !== market);
+      if (prev.length >= 2) return prev; // cap at 2
+      return [...prev, market];
+    });
+  }
+
+  async function doInterpret() {
+    const text = freeText.trim();
+    if (!text) return;
+    if (interpretLoading) return;
+
+    setError('');
+
+    // Check localStorage cache
+    const key = text.toLowerCase();
+    const cached = readInterpretCache(key);
+    if (cached?.length) {
+      setBroadMarkets(cached);
+      setConfirmedBroadMarkets([]);
+      setStep('confirm-broad');
+      return;
+    }
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setInterpretLoading(true);
+
+    try {
+      const res = await fetch('/api/agent/interpret', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok || !res.body) throw new Error();
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const arrived: BroadMarket[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const chunk = JSON.parse(trimmed) as InterpretChunk;
+            if (chunk.type === 'market') {
+              arrived.push(chunk.data);
+            } else if (chunk.type === 'done') {
+              setBroadMarkets(arrived);
+              setConfirmedBroadMarkets([]);
+              writeInterpretCache(key, arrived);
+              setStep('confirm-broad');
+            } else if (chunk.type === 'error') {
+              setError(chunk.message ?? 'Something went wrong.');
+            }
+          } catch {
+            /* ignore non-JSON lines */
+          }
+        }
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setError('Something went wrong. Try again.');
+    } finally {
+      setInterpretLoading(false);
+    }
   }
 
   function toggleSteer(tag: string) {
@@ -459,10 +624,10 @@ export function OnboardContent() {
     // state-transition edge cases that the UI disabled prop can't fully prevent
     if (!isSteer && loading) return;
     if (isSteer && steerLoading) return;
-    if (!selectedTags.length && !freeText.trim()) return; // nothing to send
+    if (!confirmedBroadMarkets.length && !freeText.trim()) return; // nothing to send
     // Check localStorage cache for non-steer runs
     if (!isSteer) {
-      const key = excavateCacheKey(selectedTags, freeText);
+      const key = excavateCacheKey(confirmedBroadMarkets, freeText);
       const cached = readExcavateCache(key);
       if (cached?.length) {
         setMarkets(cached);
@@ -473,6 +638,8 @@ export function OnboardContent() {
 
     // Snapshot markets before clearing — needed to restore if steer aborts or errors
     const prevMarkets = markets;
+    // Save original cards the first time a steer fires so user can return to them
+    if (isSteer && !originalMarkets) setOriginalMarkets(markets);
 
     // Abort any in-flight request
     abortRef.current?.abort();
@@ -492,7 +659,7 @@ export function OnboardContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tags: selectedTags,
+          broadMarkets: confirmedBroadMarkets,
           description: freeText.trim() || undefined,
           steer: activeSteer,
           existingMarkets: isSteer ? markets : undefined,
@@ -536,7 +703,7 @@ export function OnboardContent() {
               if (isSteer) {
                 setSelectedMarketIndex(null);
               } else {
-                const key = excavateCacheKey(selectedTags, freeText);
+                const key = excavateCacheKey(confirmedBroadMarkets, freeText);
                 writeExcavateCache(key, arrived);
               }
             } else if (chunk.type === 'error') {
@@ -560,6 +727,7 @@ export function OnboardContent() {
     } finally {
       setLoading(false);
       setSteerLoading(false);
+      setActiveQuickSteer(null);
     }
   }
 
@@ -706,11 +874,14 @@ export function OnboardContent() {
       if (!res.ok) throw new Error();
       const { market: created } = (await res.json()) as { market: { id: number } };
 
-      // Fire agent silently — no await, no modal
+      // Fire agent silently — no await, no modal; pass marketId directly to avoid is_active race
       fetch('/api/agent/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ today: new Date().toISOString().slice(0, 10) }),
+        body: JSON.stringify({
+          today: new Date().toISOString().slice(0, 10),
+          marketId: created.id,
+        }),
       }).catch(() => {});
 
       clearSession();
@@ -733,7 +904,8 @@ export function OnboardContent() {
         onCancel={() => {
           abortRef.current?.abort();
           setLoading(false);
-          setStep('interests');
+          // Go back to where the user was — confirm-broad if they had markets, else interests
+          setStep(broadMarkets.length > 0 ? 'confirm-broad' : 'interests');
         }}
       />
     );
@@ -742,7 +914,7 @@ export function OnboardContent() {
   // ── Screen 1 — Interests ─────────────────────────────────────────────────
 
   if (step === 'interests') {
-    const canProceed = selectedTags.length >= 1 || freeText.trim().length > 0;
+    const canProceed = freeText.trim().length > 0;
 
     return (
       <div className="bg-background text-foreground flex min-h-svh flex-col items-center justify-center px-4 py-16 sm:px-6">
@@ -750,57 +922,52 @@ export function OnboardContent() {
           <p className="text-primary font-mono text-[10px] tracking-widest uppercase">
             Signal Intelligence
           </p>
+
+          {/* Rotating conversational prompt */}
           <h1 className="text-foreground mt-4 text-2xl leading-snug font-semibold">
-            What are you into?
+            {PROMPTS[promptIndex]}
           </h1>
-          <p className="text-muted-foreground mt-1.5 text-sm">
-            Pick up to 3 — or describe it yourself. Both work together.
-          </p>
+          <button
+            type="button"
+            onClick={() => setPromptIndex((i) => (i + 1) % PROMPTS.length)}
+            className="text-muted-foreground/50 hover:text-muted-foreground mt-1.5 text-xs transition-colors"
+          >
+            Try a different question →
+          </button>
 
-          {/* Tag grid */}
-          <div className="mt-6 flex flex-wrap gap-2">
-            {INTEREST_TAGS.map((tag) => {
-              const active = selectedTags.includes(tag);
-              const maxed = selectedTags.length >= 3 && !active;
-              return (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => toggleTag(tag)}
-                  disabled={maxed}
-                  className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
-                    active
-                      ? 'border-primary text-primary bg-primary/10'
-                      : 'border-border text-muted-foreground hover:border-muted-foreground'
-                  }`}
-                >
-                  {tag}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Free text */}
-          <Input
+          {/* Free text textarea */}
+          <Textarea
             value={freeText}
             onChange={(e) => setFreeText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && canProceed) doExcavate();
-            }}
-            placeholder="add more context…"
-            className="mt-4 text-sm"
+            placeholder="e.g. I'm obsessed with personal finance, I hate how complicated taxes are, I play guitar on weekends..."
+            className="mt-5 min-h-25 resize-none rounded-none text-sm"
+            rows={4}
           />
+
+          {/* Suggestion chips */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {SUGGESTION_CHIPS.map((chip) => (
+              <button
+                key={chip}
+                type="button"
+                onClick={() => appendChip(chip)}
+                className="border-border text-muted-foreground hover:border-muted-foreground rounded-full border px-3 py-1.5 font-mono text-xs transition-colors"
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
 
           {error && <p className="text-destructive mt-2 text-xs">{error}</p>}
 
           <div className="mt-7 flex flex-col items-center gap-3">
             <Button
               type="button"
-              onClick={() => doExcavate()}
-              disabled={!canProceed}
+              onClick={() => doInterpret()}
+              disabled={!canProceed || interpretLoading}
               className="w-full rounded-none"
             >
-              Find my markets →
+              {interpretLoading ? 'Reading your interests…' : 'Find my markets →'}
             </Button>
             <button
               type="button"
@@ -810,6 +977,69 @@ export function OnboardContent() {
               Already have a market? Skip →
             </button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Screen 1b — Confirm Broad Markets ────────────────────────────────────
+
+  if (step === 'confirm-broad') {
+    const canDig = confirmedBroadMarkets.length >= 1;
+
+    return (
+      <div className="bg-background text-foreground flex min-h-svh flex-col items-center justify-center px-4 py-16 sm:px-6">
+        <div className="w-full max-w-sm">
+          <button
+            type="button"
+            onClick={() => {
+              abortRef.current?.abort();
+              setStep('interests');
+            }}
+            className="text-muted-foreground/50 hover:text-muted-foreground text-xs transition-colors"
+          >
+            ← Back
+          </button>
+
+          <h2 className="text-foreground mt-4 text-xl leading-snug font-semibold">
+            Which of these resonate?
+          </h2>
+          <p className="text-muted-foreground mt-1 text-xs">Pick up to 2.</p>
+
+          <div className="mt-5 flex flex-col gap-3">
+            {broadMarkets.map((bm) => {
+              const active = confirmedBroadMarkets.includes(bm.market);
+              return (
+                <button
+                  key={bm.market}
+                  type="button"
+                  onClick={() => toggleBroadMarket(bm.market)}
+                  disabled={!active && confirmedBroadMarkets.length >= 2}
+                  className={`w-full rounded border p-4 text-left transition-colors ${
+                    active
+                      ? 'border-primary ring-primary/20 ring-2'
+                      : confirmedBroadMarkets.length >= 2
+                        ? 'border-border cursor-not-allowed opacity-35'
+                        : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <p className="text-foreground text-sm font-semibold">{bm.market}</p>
+                  <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{bm.reason}</p>
+                </button>
+              );
+            })}
+          </div>
+
+          {error && <p className="text-destructive mt-3 text-xs">{error}</p>}
+
+          <Button
+            type="button"
+            onClick={() => doExcavate()}
+            disabled={!canDig || loading}
+            className="mt-6 w-full rounded-none"
+          >
+            Dig deeper →
+          </Button>
         </div>
       </div>
     );
@@ -826,7 +1056,7 @@ export function OnboardContent() {
             onClick={() => {
               abortRef.current?.abort();
               setSelectedMarketIndex(null);
-              setStep('interests');
+              setStep('confirm-broad');
             }}
             className="text-muted-foreground/50 hover:text-muted-foreground text-xs transition-colors"
           >
@@ -836,11 +1066,6 @@ export function OnboardContent() {
           <h2 className="text-foreground mt-4 text-xl leading-snug font-semibold">
             Pick the one that fits.
           </h2>
-          {steerLoading && (
-            <div className="mt-1">
-              <p className="text-muted-foreground text-sm">Finding better options…</p>
-            </div>
-          )}
 
           {/* Market cards */}
           <div className="mt-5 flex flex-col gap-3">
@@ -859,20 +1084,6 @@ export function OnboardContent() {
             ))}
           </div>
 
-          {/* Cancel — only visible while steer is running */}
-          {steerLoading && (
-            <button
-              type="button"
-              onClick={() => {
-                abortRef.current?.abort();
-                setSteerLoading(false);
-              }}
-              className="text-muted-foreground/40 hover:text-muted-foreground mt-4 font-mono text-xs transition-colors"
-            >
-              Cancel
-            </button>
-          )}
-
           {/* Continue button — visible when a card is selected */}
           {selectedMarketIndex !== null && !steerLoading && (
             <Button
@@ -886,21 +1097,74 @@ export function OnboardContent() {
 
           {error && <p className="text-destructive mt-3 text-xs">{error}</p>}
 
-          {/* Escape hatch — inline, never navigates away */}
-          {markets.length > 0 && !steerLoading && (
+          {/* Refine — always visible once markets are loaded */}
+          {markets.length > 0 && (
             <div className="mt-6">
-              <button
-                type="button"
-                onClick={() => setSteerExpanded((v) => !v)}
-                className="text-muted-foreground/60 hover:text-muted-foreground text-xs transition-colors"
-              >
-                {steerExpanded ? '↑ Collapse' : 'None of these feel right — let me refine ›'}
-              </button>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span className="text-muted-foreground/40 font-mono text-[10px]">Refine:</span>
+                {QUICK_STEER_CHIPS.map((chip) => {
+                  const isActive = steerLoading && activeQuickSteer === chip;
+                  return (
+                    <button
+                      key={chip}
+                      type="button"
+                      disabled={steerLoading}
+                      onClick={() => {
+                        setActiveQuickSteer(chip);
+                        void doExcavate([chip]);
+                      }}
+                      className={`font-mono text-xs transition-colors disabled:pointer-events-none ${
+                        isActive
+                          ? 'text-primary'
+                          : 'text-muted-foreground/50 hover:text-muted-foreground'
+                      }`}
+                    >
+                      {isActive ? '…' : chip}
+                    </button>
+                  );
+                })}
+                {originalMarkets && !steerLoading && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMarkets(originalMarkets);
+                      setOriginalMarkets(null);
+                      setSelectedMarketIndex(null);
+                    }}
+                    className="text-muted-foreground/30 hover:text-muted-foreground font-mono text-[10px] transition-colors"
+                  >
+                    ← original
+                  </button>
+                )}
+                {steerLoading && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      abortRef.current?.abort();
+                      setSteerLoading(false);
+                      setActiveQuickSteer(null);
+                    }}
+                    className="text-muted-foreground/30 hover:text-muted-foreground font-mono text-[10px] transition-colors"
+                  >
+                    cancel
+                  </button>
+                )}
+              </div>
 
-              {steerExpanded && (
+              {!steerLoading && (
+                <button
+                  type="button"
+                  onClick={() => setSteerExpanded((v) => !v)}
+                  className="text-muted-foreground/30 hover:text-muted-foreground mt-2 font-mono text-[10px] transition-colors"
+                >
+                  {steerExpanded ? '↑ less' : 'more options →'}
+                </button>
+              )}
+
+              {steerExpanded && !steerLoading && (
                 <div className="mt-3">
                   <div className="flex flex-wrap gap-2">
-                    {STEER_TAGS.map((tag) => {
+                    {EXTENDED_STEER_TAGS.map((tag) => {
                       const active = selectedSteer.includes(tag);
                       return (
                         <button
@@ -918,14 +1182,13 @@ export function OnboardContent() {
                       );
                     })}
                   </div>
-
                   <Button
                     type="button"
                     onClick={() => doExcavate()}
-                    disabled={selectedSteer.length === 0 || steerLoading}
+                    disabled={selectedSteer.length === 0}
                     className="mt-3 rounded-none"
                   >
-                    {steerLoading ? 'Trying…' : 'Try these →'}
+                    Try these →
                   </Button>
                 </div>
               )}
@@ -977,7 +1240,7 @@ export function OnboardContent() {
           {/* Sources list — flex-1 + overflow-y-auto so CTA never scrolls away */}
           <div className="mt-5 flex min-h-0 flex-1 flex-col">
             <p className="text-muted-foreground/50 mb-3 shrink-0 font-mono text-[10px]">
-              HN · Product Hunt · r/SaaS · and 2 more run by default.
+              HN · Product Hunt · r/SaaS · r/Entrepreneur · Indie Hackers run by default.
             </p>
             <div className="flex-1 overflow-y-auto">
               <div className="flex flex-col gap-2 pb-2">

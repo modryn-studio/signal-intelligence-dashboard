@@ -14,6 +14,7 @@ interface Props {
   onClose: () => void;
   market: Market;
   sources: MarketSource[];
+  caps?: Record<string, string>;
   onUpdated: () => void;
   onDeleted?: () => void;
 }
@@ -27,16 +28,19 @@ const STATUS_STYLES: Record<string, { label: string; className: string }> = {
 
 const ALWAYS_ON_SOURCES = [
   { name: 'Hacker News', description: 'Top stories >30 points, daily', status: 'live' },
-  { name: 'Product Hunt', description: 'Top 20 launches by votes', status: 'needs_api_key' },
+  {
+    name: 'Product Hunt',
+    description: 'Top 20 launches by votes',
+    status: 'needs_api_key',
+    capKey: 'product hunt',
+  },
   { name: 'Indie Hackers', description: 'Top weekly posts', status: 'fragile' },
   { name: 'r/SaaS', description: 'Top daily posts', status: 'live' },
   { name: 'r/Entrepreneur', description: 'Top daily posts', status: 'live' },
-] as const;
+];
 
 const SOURCE_TYPE_OPTIONS: { value: SourceType; label: string; placeholder: string }[] = [
   { value: 'subreddit', label: 'Subreddit', placeholder: 'subreddit name' },
-  { value: 'g2_product', label: 'G2 Product', placeholder: 'product slug' },
-  { value: 'capterra_product', label: 'Capterra Product', placeholder: 'product slug' },
 ];
 
 function relativeTime(dateStr: string | null): string {
@@ -56,6 +60,7 @@ export function MarketConfigModal({
   onClose,
   market,
   sources: initialSources,
+  caps = {},
   onUpdated,
   onDeleted,
 }: Props) {
@@ -176,7 +181,8 @@ export function MarketConfigModal({
             </label>
             <div className="space-y-1.5">
               {ALWAYS_ON_SOURCES.map((s) => {
-                const statusInfo = STATUS_STYLES[s.status] ?? STATUS_STYLES.live;
+                const resolvedStatus = s.capKey && caps[s.capKey] ? caps[s.capKey] : s.status;
+                const statusInfo = STATUS_STYLES[resolvedStatus] ?? STATUS_STYLES.live;
                 return (
                   <div
                     key={s.name}

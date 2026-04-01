@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createRouteLogger } from '@/lib/route-logger';
-import { withTimeout, AGENT_TIMEOUT_MS } from '@/lib/agent-guard';
+import { timedAbort, AGENT_TIMEOUT_MS } from '@/lib/agent-guard';
 
 const log = createRouteLogger('agent-validate');
 
@@ -27,8 +27,10 @@ export async function POST(request: Request): Promise<Response> {
 
     log.info(ctx.reqId, 'Researching proven market', { thesis: thesis.slice(0, 80) });
 
-    const message = await withTimeout(
-      client.messages.create(
+    const { signal: callSignal, clear } = timedAbort(AGENT_TIMEOUT_MS, signal);
+    let message: Anthropic.Message;
+    try {
+      message = await client.messages.create(
         {
           model: 'claude-sonnet-4-6',
           max_tokens: 512,
@@ -45,10 +47,11 @@ Example output: Exploding Topics Pro ($49/mo), Trends.vc ($150/mo), SparkToro ($
             },
           ],
         },
-        { signal }
-      ),
-      AGENT_TIMEOUT_MS
-    );
+        { signal: callSignal }
+      );
+    } finally {
+      clear();
+    }
 
     log.info(ctx.reqId, 'Claude response', {
       stop_reason: message.stop_reason,

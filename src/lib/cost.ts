@@ -1,6 +1,6 @@
 // Pricing confirmed March 2026 — platform.claude.com/docs/en/about-claude/pricing
 // Sonnet 4.6: $3/MTok input · $15/MTok output
-// web_search_20260209: $0.01 per search ($10/1,000)
+// web_search_20250305 + web_search_20260209: $0.01 per search ($10/1,000)
 // Tool use system prompt overhead (346 tokens) is already included in input_tokens by the SDK.
 
 const INPUT_PER_TOKEN = 3 / 1_000_000;

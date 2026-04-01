@@ -50,7 +50,7 @@ export interface Market {
   signal_count?: number;
 }
 
-export type SourceType = 'subreddit' | 'g2_product' | 'capterra_product' | 'custom_url';
+export type SourceType = 'subreddit' | 'custom_url';
 export type SourceStatus = 'live' | 'fragile' | 'needs_api_key' | 'inactive';
 
 export interface MarketSource {
@@ -88,7 +88,7 @@ export const SOURCE_CATEGORIES: Record<
   complaints: {
     label: 'Complaints',
     color: 'text-[oklch(0.72_0.19_27)]',
-    sources: ['Reddit', 'G2 Reviews', 'Trustpilot', 'App Store Reviews', 'Twitter/X'],
+    sources: ['Reddit', 'Trustpilot', 'App Store Reviews', 'Twitter/X'],
   },
   indie: {
     label: 'Indie',

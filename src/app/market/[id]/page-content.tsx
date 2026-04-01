@@ -108,7 +108,7 @@ export function MarketDashboard({ marketId }: { marketId: number }) {
         marketId={marketId}
         onRetry={handleRetry}
       />
-      <DashboardLayout />
+      <DashboardLayout marketId={marketId} />
     </div>
   );
 }

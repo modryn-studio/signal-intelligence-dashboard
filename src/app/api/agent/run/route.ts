@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { sql, getActiveMarketId } from '@/lib/db';
 import { createRouteLogger } from '@/lib/route-logger';
-import { withTimeout, AGENT_TIMEOUT_MS } from '@/lib/agent-guard';
+import { timedAbort, AGENT_TIMEOUT_MS } from '@/lib/agent-guard';
 
 import { getTodayQuestion } from '@/lib/utils';
 
@@ -178,7 +178,11 @@ async function fetchReddit(subreddit: string): Promise<FetchedItem[]> {
       headers: { 'User-Agent': 'signal-intelligence-dashboard/1.0' },
       cache: 'no-store',
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      if (res.status === 429)
+        console.warn(`[agent-run] Reddit 429 on r/${subreddit} — rate limited`);
+      return [];
+    }
     const data = (await res.json()) as {
       data: {
         children: Array<{ data: { title: string; url: string; score: number } }>;
@@ -188,95 +192,10 @@ async function fetchReddit(subreddit: string): Promise<FetchedItem[]> {
       id: `reddit_${subreddit}_${i}`,
       title: child.data.title,
       url: child.data.url,
-      source: 'Reddit',
+      source: `r/${subreddit}`,
       defaultCategory: 'complaints' as SourceCategory,
       score: child.data.score,
     }));
-  } catch {
-    return [];
-  }
-}
-
-async function fetchG2Reviews(productSlug: string): Promise<FetchedItem[]> {
-  try {
-    const res = await fetch(
-      `https://www.g2.com/products/${encodeURIComponent(productSlug)}/reviews?utf8=%E2%9C%93&filters%5Bnps_score%5D=2.0%2C3.0`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; signal-intelligence-dashboard/1.0)',
-          Accept: 'text/html',
-        },
-        cache: 'no-store',
-      }
-    );
-    if (!res.ok) return [];
-    const html = await res.text();
-
-    // Extract review text from G2 review cards — fragile HTML parsing
-    const reviewRegex =
-      /<div[^>]*class="[^"]*pjax-container[^"]*"[^>]*>[\s\S]*?<div[^>]*itemprop="reviewBody"[^>]*>([\s\S]*?)<\/div>/g;
-    const items: FetchedItem[] = [];
-    let match: RegExpExecArray | null;
-    let i = 0;
-    while ((match = reviewRegex.exec(html)) !== null && items.length < 15) {
-      const text = match[1]
-        .replace(/<[^>]*>/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (text.length < 20) continue;
-      items.push({
-        id: `g2_${productSlug}_${i++}`,
-        title: text.slice(0, 200),
-        url: `https://www.g2.com/products/${productSlug}/reviews`,
-        source: 'G2',
-        defaultCategory: 'complaints',
-        score: 0,
-        isCustomSource: true,
-      });
-    }
-    return items;
-  } catch {
-    return [];
-  }
-}
-
-async function fetchCapterraReviews(productSlug: string): Promise<FetchedItem[]> {
-  try {
-    const res = await fetch(
-      `https://www.capterra.com/p/${encodeURIComponent(productSlug)}/reviews/`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; signal-intelligence-dashboard/1.0)',
-          Accept: 'text/html',
-        },
-        cache: 'no-store',
-      }
-    );
-    if (!res.ok) return [];
-    const html = await res.text();
-
-    // Extract review text — fragile HTML parsing
-    const reviewRegex = /<div[^>]*class="[^"]*review-content[^"]*"[^>]*>([\s\S]*?)<\/div>/g;
-    const items: FetchedItem[] = [];
-    let match: RegExpExecArray | null;
-    let i = 0;
-    while ((match = reviewRegex.exec(html)) !== null && items.length < 15) {
-      const text = match[1]
-        .replace(/<[^>]*>/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (text.length < 20) continue;
-      items.push({
-        id: `capterra_${productSlug}_${i++}`,
-        title: text.slice(0, 200),
-        url: `https://www.capterra.com/p/${productSlug}/reviews/`,
-        source: 'Capterra',
-        defaultCategory: 'complaints',
-        score: 0,
-        isCustomSource: true,
-      });
-    }
-    return items;
   } catch {
     return [];
   }
@@ -288,21 +207,21 @@ export async function POST(req: Request): Promise<Response> {
   try {
     // Client passes today's local date so agent stamps signals correctly regardless of server timezone
     let today: string;
+    let clientMarketId: number | null = null;
     try {
-      const body = (await req.json()) as { today?: string };
+      const body = (await req.json()) as { today?: string; marketId?: number };
       today = body.today || new Date().toISOString().split('T')[0];
+      clientMarketId = typeof body.marketId === 'number' ? body.marketId : null;
     } catch {
       today = new Date().toISOString().split('T')[0];
     }
     const question = getTodayQuestion();
     log.info(ctx.reqId, 'Fetching sources', { question });
 
-    // Resolve active market for scoping + custom sources
-    marketId = await getActiveMarketId();
+    // Prefer explicit marketId from client (avoids is_active race condition when multiple markets exist)
+    marketId = clientMarketId ?? (await getActiveMarketId());
     let marketContext = '';
     let customSubreddits: string[] = [];
-    let g2Slugs: { id: number; value: string }[] = [];
-    let capterraSlugs: { id: number; value: string }[] = [];
 
     if (marketId) {
       await sql`UPDATE markets SET scan_status = 'scanning', updated_at = NOW() WHERE id = ${marketId}`;
@@ -318,12 +237,6 @@ export async function POST(req: Request): Promise<Response> {
       customSubreddits = sourcesRows
         .filter((r) => r.source_type === 'subreddit')
         .map((r) => r.value);
-      g2Slugs = sourcesRows
-        .filter((r) => r.source_type === 'g2_product')
-        .map((r) => ({ id: r.id, value: r.value }));
-      capterraSlugs = sourcesRows
-        .filter((r) => r.source_type === 'capterra_product')
-        .map((r) => ({ id: r.id, value: r.value }));
       if (market) {
         marketContext = `The builder is researching the **${market.name}** market.${
           market.description ? ` ${market.description}` : ''
@@ -331,8 +244,6 @@ export async function POST(req: Request): Promise<Response> {
         log.info(ctx.reqId, 'Market context', {
           market: market.name,
           customSubreddits,
-          g2: g2Slugs.length,
-          capterra: capterraSlugs.length,
         });
       }
     }
@@ -350,31 +261,15 @@ export async function POST(req: Request): Promise<Response> {
       .flat()
       .map((item) => ({ ...item, isCustomSource: true }));
 
-    // G2/Capterra review fetches — fragile, non-fatal
-    const g2Results = await Promise.all(g2Slugs.map((s) => fetchG2Reviews(s.value)));
-    const g2Items: FetchedItem[] = g2Results.flat();
-    const capterraResults = await Promise.all(
-      capterraSlugs.map((s) => fetchCapterraReviews(s.value))
-    );
-    const capterraItems: FetchedItem[] = capterraResults.flat();
-
     // Update last_pull_at for sources that returned data
     if (marketId) {
       const sourceIdsToUpdate: number[] = [];
-      // Subreddit sources that fetched successfully
       const subredditRows = (await sql`
         SELECT id, value FROM market_sources WHERE market_id = ${marketId} AND source_type = 'subreddit' AND enabled = true
       `) as { id: number; value: string }[];
       for (const row of subredditRows) {
         const result = customRedditResults[customSubreddits.indexOf(row.value)];
         if (result && result.length > 0) sourceIdsToUpdate.push(row.id);
-      }
-      for (let i = 0; i < g2Slugs.length; i++) {
-        if (g2Results[i] && g2Results[i].length > 0) sourceIdsToUpdate.push(g2Slugs[i].id);
-      }
-      for (let i = 0; i < capterraSlugs.length; i++) {
-        if (capterraResults[i] && capterraResults[i].length > 0)
-          sourceIdsToUpdate.push(capterraSlugs[i].id);
       }
       if (sourceIdsToUpdate.length > 0) {
         await sql`UPDATE market_sources SET last_pull_at = NOW() WHERE id = ANY(${sourceIdsToUpdate})`;
@@ -388,8 +283,6 @@ export async function POST(req: Request): Promise<Response> {
       ...productHunt,
       ...indieHackers,
       ...customItems,
-      ...g2Items,
-      ...capterraItems,
     ];
     log.info(ctx.reqId, 'Fetched', {
       hn: hn.length,
@@ -398,8 +291,6 @@ export async function POST(req: Request): Promise<Response> {
       productHunt: productHunt.length,
       indieHackers: indieHackers.length,
       custom: customItems.length,
-      g2: g2Items.length,
-      capterra: capterraItems.length,
       total: allItems.length,
     });
 
@@ -409,16 +300,30 @@ export async function POST(req: Request): Promise<Response> {
     if (process.env.ANTHROPIC_API_KEY) {
       const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-      const itemsForPrompt = allItems.map(({ id, title, source, score }) => ({
+      const itemsForPrompt = allItems.map(({ id, title, source, score, isCustomSource }) => ({
         id,
         title,
         source,
         score,
+        market_specific: isCustomSource ?? false,
       }));
+
+      // Build a readable source summary for the prompt header
+      const sourceCounts = allItems.reduce<Record<string, number>>((acc, item) => {
+        acc[item.source] = (acc[item.source] ?? 0) + 1;
+        return acc;
+      }, {});
+      const sourceList = Object.entries(sourceCounts)
+        .map(([src, count]) => `${src} (${count})`)
+        .join(', ');
 
       const prompt = `${marketContext}Today's focusing question: "${question}"
 
-Below are ${allItems.length} recent posts from Hacker News, Product Hunt, Indie Hackers, r/SaaS, and r/Entrepreneur. Select the 8 to 12 most relevant to the focusing question. For each, assign source_category (trends, complaints, indie, or data — judge by content, not by source) and write a one-line note explaining what the signal is and why it matters to someone looking for underserved markets.
+Below are ${allItems.length} recent posts from: ${sourceList}.
+
+Items marked market_specific:true are custom sources purpose-selected for this market during onboarding — treat them as the highest-signal inputs and always include at least the strongest 3 from them if they exist.
+
+Select 8 to 12 signals most relevant to the focusing question and market context. For each, assign source_category (trends, complaints, indie, or data — judge by content, not source) and write a one-line note explaining what the signal is and why it matters to someone identifying underserved niches in this market.
 
 Items:
 ${JSON.stringify(itemsForPrompt, null, 2)}
@@ -427,17 +332,20 @@ Respond with ONLY valid JSON, no markdown fences, no explanation:
 {"selected":[{"id":"...","source_category":"complaints","note":"..."}]}`;
 
       log.info(ctx.reqId, 'Calling claude-sonnet-4-6', { items: allItems.length });
-      const message = await withTimeout(
-        client.messages.create(
+      const { signal: callSignal, clear } = timedAbort(AGENT_TIMEOUT_MS, req.signal);
+      let message: Anthropic.Message;
+      try {
+        message = await client.messages.create(
           {
             model: 'claude-sonnet-4-6',
             max_tokens: 2048,
             messages: [{ role: 'user', content: prompt }],
           },
-          { signal: req.signal }
-        ),
-        AGENT_TIMEOUT_MS
-      );
+          { signal: callSignal }
+        );
+      } finally {
+        clear();
+      }
 
       const raw = message.content[0]?.type === 'text' ? message.content[0].text.trim() : '{}';
       let parsed: { selected?: ClaudeSelected[] } = {};
@@ -509,6 +417,8 @@ Respond with ONLY valid JSON, no markdown fences, no explanation:
         /* ignore — DB may be unreachable */
       }
     }
-    return Response.json({ error: 'Agent run failed' }, { status: 500 });
+    return log.end(ctx, Response.json({ error: 'Agent run failed' }, { status: 500 }), {
+      error: true,
+    });
   }
 }

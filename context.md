@@ -53,17 +53,20 @@ Current: email-only — no payment gate.
 
 - schema.sql — one-time DB bootstrap (already run in Neon)
 - lib/db.ts — Neon singleton export + `getActiveMarketId()` helper
-- lib/agent-guard.ts — shared safety guards: `AGENT_TIMEOUT_MS` (60s), `WEB_SEARCH_TIMEOUT_MS` (45s), `withTimeout()` helper. All `client.messages.create()` calls wrapped.
+- lib/agent-guard.ts — shared safety guards: `AGENT_TIMEOUT_MS` (60s), `WEB_SEARCH_TIMEOUT_MS` (45s), `timedAbort()` helper. All `client.messages.create()` calls wrapped with AbortSignal. Steer path and interpret were historically missing timeouts — fixed.
 - lib/types.ts — shared TypeScript types (including Market, MarketSource, ContrarianTruth, etc.)
 - app/api/ — API routes listed below
 
 ## Route Map
 
 - `/` → Market gate — fetches `/api/markets?all=1`; redirects: 0 markets → `/onboard`, 1 market → `/market/[id]`, 2+ → inline `<MarketPicker>` sorted by signal count descending with "+ New market" button.
-- `/onboard` → Excavation onboarding — 2-screen flow:
-  - **Screen 1 (Interests)**: Grid of 12 interest tags (max 3 selectable) + freetext input. "Find my markets →" calls `/api/agent/excavate`. "Already have a market? Skip →" navigates to `/` (no localStorage flag — MarketGate handles all routing).
-  - **Screen 2 (Picking)**: Shows 4 market cards — each represents a market segment (people + problem + existing spend), not a product idea. Card headline is the person/group (e.g. "Independent Restaurant Owners"), body describes their world (what they pay for, what frustrates them). Demand badge (proven/growing/crowded). Price range reflects what the market already pays. Inline "None of these feel right" refinement with 7 steer tags + "Regenerate →". Selecting a card POSTs to `/api/markets` (name = niche, description = market description), fires `/api/agent/run` silently, navigates to `/market/[id]`.
-  - Loading state: Full-screen `ExcavateLoading` component with 30s ease-out CSS progress bar during the ~15s stub phase (bar reaches ~70% when cards arrive, stays there while enrich finishes in background).
+- `/onboard` → Excavation onboarding — 4-step flow:
+  - **Screen 1 (Interests)**: Suggestion chips (Finance, Health & Fitness, etc.) + freetext prompt. "Find my markets →" calls `/api/agent/interpret`.
+  - **Screen 1b (Confirm broad markets)**: Shows 2–4 broad market categories from interpret. User confirms 1–2. "Continue →" calls `/api/agent/excavate`.
+  - **Screen 2 (Picking)**: Shows 4 market cards from excavate (all appear at once after loading). Card headline = the person (e.g. "Independent Restaurant Owners"). Demand badge (proven/growing/crowded). One card marked best fit with `top_pick_reason`. Quick steer chips (more niche, more proven, completely different) + expanded steer tags → re-calls excavate steer path (no tools, fast). Selecting a card → Screen 3.
+  - **Screen 3 (Sources)**: Calls `/api/agent/discover-sources` — subreddits stream in one by one as found. User toggles sources on/off. "Start scanning →" POSTs to `/api/markets`, fires `/api/agent/run` silently in background (passes `marketId` directly to avoid `is_active` race), navigates to `/market/[id]`.
+  - Loading state: Full-screen `ExcavateLoading` component with 55s ease-out CSS progress bar to ~90% during excavate phase (~45–60s actual).
+  - Session persisted in localStorage (`onboard-session`) — survives refresh and navigates back to the correct screen. Excavate + discover caches are day-scoped so they auto-expire each day.
 - `/market/[id]` → Market dashboard — on mount PATCHes `/api/markets` to activate the market (single atomic SQL: `is_active = (id = $id)`), shows spinner while PATCH in flight, then renders full dashboard with `<DashboardHeader marketId={id}>` + `<DashboardLayout>`.
 
 ## API Routes
@@ -95,27 +98,38 @@ Current: email-only — no payment gate.
   - `recent_streak`: `[{ date, count }]` last 14 days
 - `/api/digest` → POST `{ email }` — generates HTML email (inputs by category, observations, active truths filtered by `status != 'invalidated'`; all market-scoped via `getActiveMarketId()`); inserts to `email_digests` table; returns `{ success, preview: htmlString, stats }`. Delivery requires Resend/SMTP config.
 - `/api/feedback` → POST `{ type: 'newsletter'|'feedback'|'bug', email?, message?, page? }` — logs to console; optional Resend/SMTP delivery
-- `/api/agent/run` → POST `{ today: YYYY-MM-DD }` — market-aware: injects active market name + description into Claude prompt as focus filter; fetches HN (Algolia), Product Hunt, Indie Hackers, r/SaaS, r/Entrepreneur + custom subreddits from `market_sources`; Claude (claude-sonnet-4-6, no tools, 60s timeout, req.signal threaded) selects ~10 most relevant, assigns `source_category`; deduplicates by URL+title for today; stamps `market_id`; custom-source items tagged `['agent', 'custom-source']`; returns `{ logged, fetched, question }`
-- `/api/agent/evaluate` → POST `{ date? }` — streaming NDJSON; fetches signal_inputs for date; evaluates in batches of 5 (concurrency cap); for each: fetches real source content first (Reddit JSON API, HN Algolia, article HTML); Claude (claude-sonnet-4-6, req.signal threaded) returns `observe|skip|delete` + proposed observation title+body; **web_search is conditional** — skipped when content was fetched (60s timeout), used as fallback (max 1 use, 45s timeout) only when content fetch returns empty; streams each result as a JSON line; final chunk is synthesis (priority IDs, priority statement, patterns, thesis candidate) — synthesis always has web_search available (max 1 use, 45s timeout, req.signal threaded)
+- `/api/agent/run` → POST `{ today: YYYY-MM-DD }` — market-aware: injects active market name + description into Claude prompt as focus filter; fetches HN (Algolia), Product Hunt, Indie Hackers, r/SaaS, r/Entrepreneur + custom subreddits from `market_sources`; Claude (claude-sonnet-4-6, no tools, 60s `timedAbort`, req.signal threaded) selects ~10 most relevant, assigns `source_category`; deduplicates by URL+title for today; stamps `market_id`; custom-source items tagged `['agent', 'custom-source']`; returns `{ logged, fetched, question }`
+- `/api/agent/evaluate` → POST `{ date? }` — streaming NDJSON; fetches signal_inputs for date; evaluates in batches of 5 (concurrency cap); for each: fetches real source content first (Reddit JSON API, HN Algolia, article HTML); Claude (claude-sonnet-4-6) returns `observe|skip|delete` + proposed observation title+body; **web_search is conditional** — skipped when content was fetched (60s timeout), used as fallback (`web_search_20250305`, max 1 use, 45s timeout) only when content fetch returns empty; streams each result as a JSON line; final chunk is synthesis (priority IDs, priority statement, patterns, thesis candidate) — synthesis has no tools (60s timeout, pure inference over already-evaluated signals)
 - `/api/agent/propose` → POST (no body) — reads last 30 observations (all dates); Claude (no tools, 60s timeout, req.signal threaded) finds structural pattern → proposes one thesis; returns `{ thesis, conviction_level, supporting_observations: [{id, title}], reasoning }`; client caches in localStorage by date under `propose-cache`
 - `/api/agent/validate` → POST `{ thesis }` — Claude (no tools, 60s timeout, req.signal threaded) lists 2–3 real products serving this thesis; returns `{ proposed_proven_market }`; client caches in localStorage by thesis ID + date under `validate-cache`
 - `/api/agent/lifestyle` → POST `{ thesis, proven_market }` — Claude (no tools, 60s timeout, req.signal threaded) assesses 5 filters (solo maintainable, recurring revenue day one, VC-ignored TAM, reachable first 20, boring enough for 5 years); Q2 (recurring revenue) is a knockout filter; returns `{ questions: [{label, pass, reasoning}], overall_pass }`; client caches in localStorage by thesis ID + date under `lifestyle-cache`
-- `/api/agent/excavate` → POST `{ tags: string[], description?: string, steer?: string[] }` — Streaming NDJSON. Two-phase:
-  - **Stub phase**: Claude (claude-sonnet-4-6, no tools) generates 4 market segments as people-first cards. Each card names the person (market_name = group, e.g. "Independent Restaurant Owners"), their world (description = what they pay for, what frustrates them), demand level, and price range. Explicitly bans product names or tool ideas — the micro niche emerges from the signal feed, not from onboarding. Streamed as `{type:'market', data: MarketOption}` chunks.
-  - **Enrich phase**: 4 parallel Claude calls with `web_search_20260209` (max 1 use each, 2048 max_tokens, 45s timeout, in-flight dedup, req.signal threaded — aborts on client disconnect). Verifies pricing, finds subreddits, names specific competing products. Streamed as `{type:'update', data}` chunks.
-  - Steer path: cheap re-generation with modifiers, no web search.
-  - Each MarketOption: `{ overall_market, niche, micro_niche, market_name, price_range, demand: 'proven'|'growing'|'crowded', description, reasoning, recommended_sources: [{source_type, value}] }`
-- `/api/agent/discover-sources` → POST `{ market_name, micro_niche, description?, existing_subreddits? }` — Streaming NDJSON; Claude with `web_search_20260209` (3–5 uses depending on whether subreddits already known from enrich, 45s timeout, req.signal threaded); in-flight dedup per market_name (Set); finds subreddits + G2/Capterra product pages; streams as `{type:'source', data: DiscoveredSource}` chunks.
+- `/api/agent/interpret` → POST `{ text: string }` — Claude (claude-sonnet-4-6, no tools, 512 max_tokens) reads freetext and surfaces 2–4 broad market categories hiding in the user's words. Returns NDJSON `{type:'market', data: {market, reason}}` chunks. Server-side 24h cache + client localStorage day-scoped cache.
+- `/api/agent/excavate` → POST `{ broadMarkets: string[], description?: string, steer?: string[], existingMarkets?: MarketOption[] }` — Streaming NDJSON. Two paths:
+  - **Normal path**: Claude (claude-sonnet-4-6, `web_search_20260209`, max 2 uses, 90s `timedAbort`, req.signal threaded) generates 4 market segment cards. Non-streaming — all 4 cards arrive at once after the full Claude response completes (~45–60s). Flushed as `{type:'market', data: MarketOption}` chunks. Server-side 24h cache + client localStorage day-scoped cache. In-flight dedup per `broadMarkets+description` key. Cost per call: ~$0.15 (dominated by web search context tokens).
+  - **Steer path**: Claude (no tools, 2048 max_tokens, no timeout guard, ~5–10s) regenerates 4 cards using existing cards + steer modifiers. Not cached.
+  - Each MarketOption: `{ overall_market, niche, micro_niche, market_name, demand: 'proven'|'growing'|'crowded', description, top_pick: boolean, top_pick_reason: string, recommended_sources: [{source_type, value}] }`
+- `/api/agent/discover-sources` → POST `{ market_name, micro_niche, description?, existing_subreddits? }` — Streaming NDJSON; Claude (no tools, 60s timeout) generates subreddit suggestions from training knowledge; in-flight dedup per market_name (Map); finds relevant subreddits; streams as `{type:'source', data: DiscoveredSource}` chunks.
 
-## Current State (as of March 31, 2026)
+## Current State (as of April 1, 2026)
 
 Full pipeline is wired: Market → Signal → Observation → Thesis → Validate → Lifestyle → Ready to Build.
+
+### Cost/Drain Guards
+
+- All Claude calls use `timedAbort()` from `lib/agent-guard.ts` — cancels the underlying HTTP request when timeout fires (not just Promise.race which leaves orphaned billing). Constants: `AGENT_TIMEOUT_MS` (60s), `WEB_SEARCH_TIMEOUT_MS` (45s).
+- Web search is used surgically — only 2 of 11 Claude calls have it enabled:
+  - `excavate` (main path): `web_search_20260209` (max 2 uses) — dynamic filtering for demand verification. This is the core onboarding value-add, worth the ~$0.15.
+  - `evaluate` (per-signal fallback): `web_search_20250305` (max 1 use) — lightweight lookup when content fetch returns empty. Basic search snippets are enough.
+- All other calls (interpret, steer, discover-sources, run, evaluate synthesis, propose, validate, lifestyle, synthesize) use no tools — pure inference.
+- Source discovery is subreddit-only. Run Agent fetches from HN Algolia, Product Hunt GraphQL, Indie Hackers HTML, Reddit JSON + custom subreddits.
+- Reddit `fetchReddit()` returns `[]` silently on all errors; logs `console.warn` specifically for 429s. Scan completes with fewer signals — user is not notified. HN/PH/IH are often filtered out for non-developer markets (Claude's focus filter works correctly — not a bug).
+- `steer` (excavate refinement) and `interpret` (broad-market detection) both wrap their Claude calls with `timedAbort(AGENT_TIMEOUT_MS)` — previously had no server-side deadline, could hang indefinitely on Anthropic stall.
 
 ### Onboarding / Market Gate
 
 - `/` fetches market list: 0 → `/onboard`, 1 → `/market/[id]`, 2+ → `MarketPicker` inline. No localStorage flags — routing is purely based on market count.
 - `MarketPicker` at `/`: markets sorted by `signal_count DESC`, each card shows name + description + signal count. "+ New market" button navigates to `/onboard`.
-- Onboarding is 2-screen: interest tags/freetext → market card selection. Cards show market segments (person + problem + existing spend), not product ideas. `ExcavateLoading` full-screen component shows during the ~15s stub phase (30s ease-out CSS progress bar — bar reaches ~70% when cards arrive). Steer refinement inline on screen 2.
+- Onboarding is 4-step: freetext → confirm broad markets → market card selection → source discovery. `interpret` detects broad markets from freetext (~3s, <$0.01). `excavate` generates the 4 market cards with web_search for demand verification (~45–60s, ~$0.15 — all 4 cards arrive at once, not streamed individually). `discover-sources` suggests subreddits from Claude's training knowledge (no web search, ~10s, ~$0.02 — streams one by one). `ExcavateLoading` full-screen component shows during excavate (55s ease-out CSS progress bar to ~90%). Steer refinement (quick chips + expanded) on screen 2 re-calls excavate without tools (fast, not cached).
 - **Cost safety on onboarding**: `OnboardContent` aborts in-flight requests on unmount (component cleanup `useEffect`). `doExcavate` re-entry guard: bails if already loading. Enrich calls thread `reqSignal` from HTTP request — client disconnect cancels all 4 parallel web_search calls immediately.
 - Skip → navigates to `/` directly (MarketGate handles routing based on market count; if 0 markets, redirects back to `/onboard`).
 - Market activated via single atomic SQL PATCH on `/market/[id]` mount — no two-statement race condition.
@@ -212,7 +226,7 @@ Full pipeline is wired: Market → Signal → Observation → Thesis → Validat
 **observations**: `id, date, title, body, related_input_ids INT[], tags[], created_at, market_id FK`
 **contrarian_truths**: `id, date, thesis, supporting_observations INT[], conviction_level (1–5), status (forming|validated|invalidated), proven_market TEXT, lifestyle_pass BOOLEAN, lifestyle_results JSONB, created_at, updated_at, market_id FK`
 **markets**: `id, name, description, is_active BOOLEAN, created_at, updated_at`
-**market_sources**: `id, market_id FK (CASCADE), source_type ('subreddit'), value, created_at`
+**market_sources**: `id, market_id FK (CASCADE), source_type ('subreddit'|'custom_url'), value, display_name, description, status ('live'|'fragile'|'needs_api_key'|'inactive'), enabled BOOLEAN, last_pull_at, created_at`
 **email_digests**: `id, recipient_email, digest_date, inputs_count, observations_count, status, sent_at`
 
 All `market_id` columns self-migrate at cold-start via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.

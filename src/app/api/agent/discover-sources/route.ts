@@ -1,17 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createRouteLogger } from '@/lib/route-logger';
-import { timedAbort, DISCOVER_TIMEOUT_MS } from '@/lib/agent-guard';
+import { timedAbort, AGENT_TIMEOUT_MS } from '@/lib/agent-guard';
 import { logTokenCost } from '@/lib/cost';
 
 const log = createRouteLogger('agent-discover-sources');
 
-// Prevent duplicate expensive web_search calls for the same market
-const inFlightDiscovery = new Set<string>();
+// Prevent duplicate expensive web_search calls for the same market.
+// Map value is a Promise that resolves to the discovered sources — concurrent
+// requests join it and stream the same result instead of getting empty data.
+const inFlightDiscovery = new Map<string, Promise<DiscoveredSource[]>>();
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface DiscoveredSource {
-  source_type: 'subreddit' | 'g2_product' | 'capterra_product' | 'custom_url';
+  source_type: 'subreddit';
   value: string;
   display_name: string;
   description: string;
@@ -32,7 +34,7 @@ interface DiscoverBody {
 
 // ── Prompt ─────────────────────────────────────────────────────────────────
 
-const SOURCE_FORMAT = `{"source_type":"subreddit|g2_product|capterra_product","value":"...","display_name":"...","description":"...","status":"live|fragile"}`;
+const SOURCE_FORMAT = `{"source_type":"subreddit","value":"...","display_name":"r/...","description":"...","status":"live"}`;
 
 function buildPrompt(
   marketName: string,
@@ -42,33 +44,48 @@ function buildPrompt(
 ): string {
   const hasSubreddits = existingSubreddits && existingSubreddits.length > 0;
 
-  const subredditBlock = hasSubreddits
-    ? `Subreddits already found for this market — skip subreddit discovery entirely:\n${existingSubreddits!.map((s) => `- r/${s}`).join('\n')}\n`
-    : `1. **2–4 subreddits** where the market's USERS (not founders, not developers) discuss pain points, ask for recommendations, or complain about existing tools. Communities where the actual customers hang out. Do NOT include r/SaaS, r/Entrepreneur, r/startups, r/indiehackers — those are already included by default.\n`;
+  if (hasSubreddits) {
+    return `You are researching signal sources for a solo developer entering the "${marketName}" market.
 
-  const numberedG2 = hasSubreddits ? '1' : '2';
-  const numberedCap = hasSubreddits ? '2' : '3';
+The micro-niche: ${microNiche}${description ? `\nAdditional context: ${description}` : ''}
+
+Subreddits already found for this market — skip subreddit discovery entirely:
+${existingSubreddits!.map((s) => `- r/${s}`).join('\n')}
+
+Find **2–4 additional subreddits** where the market's USERS (not founders, not developers) discuss pain points, ask for recommendations, or complain about existing tools. Communities where the actual customers hang out. Do NOT include r/SaaS, r/Entrepreneur, r/startups, r/indiehackers — those are already included by default. Do NOT repeat the subreddits listed above.
+
+For each source, output ONE JSON object per line (NDJSON):
+- source_type: "subreddit"
+- value: subreddit name without r/ prefix
+- display_name: human label (e.g. "r/freelance")
+- description: what signal it provides (e.g. "Freelancers discussing invoicing pain points and tool recommendations")
+- status: "live"
+
+Rules:
+- Only include subreddits you are confident actually exist and are active
+- Output ONLY the JSON lines — no explanation, no markdown, no array wrapper
+
+${SOURCE_FORMAT}`;
+  }
 
   return `You are researching signal sources for a solo developer entering the "${marketName}" market.
 
 The micro-niche: ${microNiche}${description ? `\nAdditional context: ${description}` : ''}
 
-Find the REAL places where users of existing tools in this space talk, complain, and review products. Use web_search to verify each source actually exists.
+Find the places where users in this space talk, complain, and ask for recommendations.
 
-${hasSubreddits ? subredditBlock + '\nFind:\n' : 'Find:\n' + subredditBlock}
-${numberedG2}. **1–3 G2 product pages** for the top competing tools in this space. These are the products whose 2–3 star reviews reveal exactly what's broken. Find the actual G2 product slug (the part after g2.com/products/).
-
-${numberedCap}. **1–2 Capterra product pages** for competing tools. Find the actual Capterra product slug.
+Find:
+1. **3–6 subreddits** where the market's USERS (not founders, not developers) discuss pain points, ask for recommendations, or complain about existing tools. Communities where the actual customers hang out. Do NOT include r/SaaS, r/Entrepreneur, r/startups, r/indiehackers — those are already included by default.
 
 For each source, output ONE JSON object per line (NDJSON):
-- source_type: "subreddit" | "g2_product" | "capterra_product"
-- value: subreddit name without r/ prefix, OR the product slug for G2/Capterra
-- display_name: human label (e.g. "r/freelance", "G2 — FreshBooks", "Capterra — QuickBooks")
-- description: what signal it provides (e.g. "Freelancers discussing invoicing pain points and tool recommendations", "2–3 star reviews revealing billing workflow gaps")
-- status: "live" for subreddits (public API), "fragile" for G2/Capterra (HTML scraping, can break)
+- source_type: "subreddit"
+- value: subreddit name without r/ prefix
+- display_name: human label (e.g. "r/freelance")
+- description: what signal it provides (e.g. "Freelancers discussing invoicing pain points and tool recommendations")
+- status: "live"
 
 Rules:
-- Every G2/Capterra product must be a real product page you verified via web search
+- Only include subreddits you are confident actually exist and are active
 - Output ONLY the JSON lines — no explanation, no markdown, no array wrapper
 
 ${SOURCE_FORMAT}`;
@@ -122,20 +139,34 @@ export async function POST(req: Request): Promise<Response> {
   // use a local AbortController aborted via the stream's cancel() instead.
   const streamAbort = new AbortController();
 
-  // If same market is already being sourced, return immediately to avoid duplicate web_search billing
   const flightKey = market_name.trim().toLowerCase();
+
+  // If same market is already being sourced, join the existing Promise so the
+  // second request gets the real sources instead of an empty done.
   if (inFlightDiscovery.has(flightKey)) {
-    log.info(ctx.reqId, 'Skipping duplicate in-flight request', { market_name });
-    const single = new ReadableStream({
-      start(c) {
-        c.enqueue(encoder.encode(JSON.stringify({ type: 'done' }) + '\n'));
+    log.info(ctx.reqId, 'Joining in-flight request', { market_name });
+    const joined = new ReadableStream({
+      async start(c) {
+        try {
+          const sources = await inFlightDiscovery.get(flightKey)!;
+          for (const src of sources) {
+            c.enqueue(encoder.encode(JSON.stringify({ type: 'source', data: src }) + '\n'));
+          }
+          c.enqueue(encoder.encode(JSON.stringify({ type: 'done' }) + '\n'));
+        } catch {
+          c.enqueue(
+            encoder.encode(
+              JSON.stringify({ type: 'error', message: 'Source discovery failed' }) + '\n'
+            )
+          );
+        }
         c.close();
       },
     });
     return log.end(
       ctx,
-      new Response(single, { headers: { 'Content-Type': 'application/x-ndjson' } }),
-      { market_name, skipped: true }
+      new Response(joined, { headers: { 'Content-Type': 'application/x-ndjson' } }),
+      { market_name, joined: true }
     );
   }
 
@@ -149,9 +180,21 @@ export async function POST(req: Request): Promise<Response> {
         }
       }
 
-      inFlightDiscovery.add(flightKey);
+      // Register Promise before the await so concurrent requests join it
+      let resolveFlightSources!: (s: DiscoveredSource[]) => void;
+      let rejectFlightSources!: (e: unknown) => void;
+      const flightPromise = new Promise<DiscoveredSource[]>((res, rej) => {
+        resolveFlightSources = res;
+        rejectFlightSources = rej;
+      });
+      inFlightDiscovery.set(flightKey, flightPromise);
+      // Suppress unhandledRejection — callers that join this flight will receive
+      // the rejection via their own await; this no-op prevents Node from treating
+      // the original promise as unhandled when it rejects before anyone joins.
+      flightPromise.catch(() => {});
+
       const { signal: callSignal, clear: clearCall } = timedAbort(
-        DISCOVER_TIMEOUT_MS,
+        AGENT_TIMEOUT_MS,
         streamAbort.signal
       );
       try {
@@ -162,14 +205,6 @@ export async function POST(req: Request): Promise<Response> {
           {
             model: 'claude-sonnet-4-6',
             max_tokens: 2048,
-            // 3 searches without known subreddits (~54s), 2 with them (~36s) — fits in 90s timeout
-            tools: [
-              {
-                name: 'web_search',
-                type: 'web_search_20260209' as const,
-                max_uses: hasSubreddits ? 2 : 3,
-              },
-            ],
             messages: [
               {
                 role: 'user',
@@ -185,15 +220,18 @@ export async function POST(req: Request): Promise<Response> {
           { signal: callSignal }
         );
 
-        // Extract text blocks from response (may have tool_use blocks interspersed)
-        logTokenCost(ctx.reqId, 'discover', message.usage);
-        const textBlocks = message.content.filter((b) => b.type === 'text');
-        const fullText = textBlocks.map((b) => b.text).join('\n');
+        logTokenCost(ctx.reqId, 'discover', message.usage as Parameters<typeof logTokenCost>[2]);
+        const fullText = message.content
+          .filter((b) => b.type === 'text')
+          .map((b) => (b as { type: 'text'; text: string }).text)
+          .join('\n');
         const sources = parseSourceLines(fullText);
 
         if (sources.length === 0) {
+          rejectFlightSources(new Error('No sources'));
           flush({ type: 'error', message: 'No sources discovered — try again' });
         } else {
+          resolveFlightSources(sources);
           log.info(ctx.reqId, 'Sources found', { count: sources.length });
           for (const src of sources) {
             flush({ type: 'source', data: src });
@@ -201,6 +239,7 @@ export async function POST(req: Request): Promise<Response> {
           flush({ type: 'done' });
         }
       } catch (error) {
+        rejectFlightSources(error);
         log.err(ctx, error);
         flush({ type: 'error', message: 'Source discovery failed' });
       } finally {

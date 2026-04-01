@@ -4,6 +4,34 @@ import { createRouteLogger } from '@/lib/route-logger';
 
 const log = createRouteLogger('markets');
 
+// Sources whose "needs_api_key" status can be promoted to "live" when the env var is present.
+// Key: substring match against source value or display_name (case-insensitive).
+const SOURCE_ENV_OVERRIDES: { match: string; envVar: string }[] = [
+  { match: 'producthunt', envVar: 'PRODUCT_HUNT_TOKEN' },
+  { match: 'product hunt', envVar: 'PRODUCT_HUNT_TOKEN' },
+];
+
+function applyEnvOverrides<T extends { status?: string; value?: string; display_name?: string }>(
+  sources: T[]
+): T[] {
+  return sources.map((s) => {
+    if (s.status !== 'needs_api_key') return s;
+    const searchable = `${s.value ?? ''} ${s.display_name ?? ''}`.toLowerCase();
+    const override = SOURCE_ENV_OVERRIDES.find((o) => searchable.includes(o.match));
+    if (override && process.env[override.envVar]) return { ...s, status: 'live' };
+    return s;
+  });
+}
+
+// Tells the client which always-on sources have their keys configured.
+function buildCaps(): Record<string, string> {
+  const caps: Record<string, string> = {};
+  for (const { match, envVar } of SOURCE_ENV_OVERRIDES) {
+    if (process.env[envVar]) caps[match] = 'live';
+  }
+  return caps;
+}
+
 // Self-migrate: tables + market_id columns on existing tables
 void sql`
   CREATE TABLE IF NOT EXISTS markets (
@@ -76,19 +104,25 @@ export async function GET(request: NextRequest): Promise<Response> {
         return log.end(ctx, Response.json({ error: 'invalid id' }, { status: 400 }), {});
       const [market] = await sql`SELECT * FROM markets WHERE id = ${numId}`;
       if (!market) return log.end(ctx, Response.json(null), { found: false });
-      const sources =
+      const rawSources =
         await sql`SELECT * FROM market_sources WHERE market_id = ${numId} ORDER BY created_at`;
-      return log.end(ctx, Response.json({ market, sources }), { id: numId });
+      const sources = applyEnvOverrides(
+        rawSources as { status?: string; value?: string; display_name?: string }[]
+      );
+      return log.end(ctx, Response.json({ market, sources, caps: buildCaps() }), { id: numId });
     }
 
     const [market] = await sql`SELECT * FROM markets WHERE is_active = true LIMIT 1`;
     if (!market) {
       return log.end(ctx, Response.json(null), { active: false });
     }
-    const sources = await sql`
+    const rawSources = await sql`
       SELECT * FROM market_sources WHERE market_id = ${(market as { id: number }).id} ORDER BY created_at
     `;
-    return log.end(ctx, Response.json({ market, sources }), {
+    const sources = applyEnvOverrides(
+      rawSources as { status?: string; value?: string; display_name?: string }[]
+    );
+    return log.end(ctx, Response.json({ market, sources, caps: buildCaps() }), {
       market: (market as { name: string }).name,
     });
   } catch (error) {
