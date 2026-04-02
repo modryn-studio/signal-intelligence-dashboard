@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { localDateStr } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -40,6 +41,7 @@ export function AddTruthModal({
           thesis: thesis.trim(),
           conviction_level: conviction,
           status: 'forming',
+          date: localDateStr(),
           ...(prefillObservationId != null && {
             supporting_observations: [prefillObservationId],
           }),

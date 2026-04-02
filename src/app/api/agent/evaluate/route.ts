@@ -1,7 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { sql } from '@/lib/db';
+import { sql, getActiveMarketId } from '@/lib/db';
 import { createRouteLogger } from '@/lib/route-logger';
-import { timedAbort, AGENT_TIMEOUT_MS, WEB_SEARCH_TIMEOUT_MS } from '@/lib/agent-guard';
+import { timedAbort, AGENT_TIMEOUT_MS } from '@/lib/agent-guard';
+import { logTokenCost } from '@/lib/cost';
 
 import { getTodayQuestion } from '@/lib/utils';
 
@@ -128,6 +129,8 @@ async function evaluateOne(
   client: Anthropic,
   signal: SignalRow & { content: string },
   question: string,
+  marketContext: string,
+  reqId: string,
   reqSignal?: AbortSignal
 ): Promise<EvaluationResult | null> {
   const prompt = `You are a brutal signal filter. Most signals are noise. Your job is to find the 2–4 signals worth acting on — not to validate everything.
@@ -135,18 +138,23 @@ async function evaluateOne(
 Your lens: "Where is something growing fast AND being served poorly?"
 
 OBSERVE — requires BOTH conditions, with hard evidence:
-A) GROWING: Specific numbers, scale, or momentum. Not "people complain" — cite the score, comment count, user count, cost figure, or trend data from the source content.
-B) POORLY SERVED: The current best solution demonstrably fails a large segment. Not "could be better" — evidence that people are stuck, building DIY workarounds, or the dominant tool explicitly doesn't cover this case.
+A) GROWING — evidence type depends on the source:
+   • Data sources (Product Hunt, HN, articles): cite specific numbers — score, user count, cost figure, growth metric, or trend data from source_content.
+   • Behavioral sources (Reddit, forums, communities): cite behavioral proxies — vote/comment count from the post, multiple people describing the same workaround, a recurring frustration pattern that appears across the thread, or someone building their own solution where a commercial one should exist. A single anecdote is not enough; the behavior must be observable in the content.
+   • A community thread where people are sharing workarounds, prompt hacks, or DIY substitutes for missing specialized tooling — the thread itself is the behavioral proxy.
+B) POORLY SERVED: The current best solution demonstrably fails a large segment. Not "could be better" — evidence that people are stuck, building DIY workarounds, paying for something that doesn't fit, or the dominant tool explicitly doesn't cover this case.
+
+For "contrarian" signal_type only: condition B can be satisfied by evidence that the dominant approach is demonstrably broken or produces known bad outcomes — you don't need to name a specific failing tool. The framing itself being wrong at scale is the service failure.
 
 If either condition is absent or only implied, do NOT mark observe.
 
 SKIP: Has one dimension but not both. Interesting topic, weak evidence, or only partially relevant to today's question.
-DELETE: General news, solved problem, opinion piece, single anecdote, product announcement without evidence of pain, or off-topic.
+DELETE: General news, solved problem, opinion piece, single anecdote, product announcement without evidence of pain, or off-topic. Note: an open-source or DIY tool built to fill a gap is NOT a product announcement — it is evidence of poor service. Treat it as a behavioral proxy for condition B.
 
 Calibration: Expect roughly 10–20% observe, 40–50% skip, 30–50% delete. If you're about to mark something observe but you're not citing specific evidence from source_content for BOTH conditions, mark it skip instead.
 
 Today's focusing question: "${question}"
-
+${marketContext}
 Signal:
 ${JSON.stringify({
   ref: signal.id,
@@ -157,7 +165,7 @@ ${JSON.stringify({
   source_content: signal.content ? signal.content.slice(0, 1500) : null,
 })}
 
-${!signal.content ? 'source_content is empty — use web_search on the title before deciding. If you find no hard evidence of both growth AND poor service, mark skip.' : ''}
+${!signal.content ? 'source_content is empty — judge from title, source, category, and existing_note alone. If you cannot cite hard evidence of both growth AND poor service from what is available, mark skip.' : ''}
 
 For OBSERVE only:
 - proposed_title: ≤10 words. Name the gap — what's growing, what's failing it.
@@ -171,21 +179,18 @@ or
 or
 {"ref":${signal.id},"recommendation":"delete","reasoning":"one sentence"}`;
 
-  const timeoutMs = signal.content ? AGENT_TIMEOUT_MS : WEB_SEARCH_TIMEOUT_MS;
-  const { signal: callSignal, clear } = timedAbort(timeoutMs, reqSignal);
+  const { signal: callSignal, clear } = timedAbort(AGENT_TIMEOUT_MS, reqSignal);
   try {
     const message = await client.messages.create(
       {
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,
-        ...(signal.content
-          ? {}
-          : { tools: [{ name: 'web_search', type: 'web_search_20250305' as const, max_uses: 1 }] }),
         messages: [{ role: 'user', content: prompt }],
       },
       { signal: callSignal }
     );
 
+    logTokenCost(reqId, 'evaluate', message.usage as Parameters<typeof logTokenCost>[2]);
     const lastText = [...message.content].reverse().find((b) => b.type === 'text');
     const rawText = lastText?.type === 'text' ? lastText.text.trim() : '{}';
     const raw = rawText
@@ -236,6 +241,7 @@ export async function POST(req: Request): Promise<Response> {
   const streamAbort = new AbortController();
 
   const body = (await req.json().catch(() => ({}))) as { date?: string };
+  // Prefer client-supplied local date so server UTC never mismatches stored signal dates
   const date = body.date ?? new Date().toISOString().split('T')[0];
 
   const encoder = new TextEncoder();
@@ -267,6 +273,33 @@ export async function POST(req: Request): Promise<Response> {
         }
 
         const question = getTodayQuestion();
+
+        // Fetch the active market once — injected into every per-signal prompt so
+        // Claude can judge POORLY SERVED against the specific market segment, not
+        // in a vacuum where general solutions appear to cover the gap.
+        const marketId = await getActiveMarketId();
+        let marketContext = '';
+        if (marketId) {
+          const [market] = (await sql`
+            SELECT name, description FROM markets WHERE id = ${marketId}
+          `) as { name: string; description: string | null }[];
+          if (market) {
+            marketContext =
+              `\nMarket: "${market.name}"` +
+              (market.description ? `\nMarket description: "${market.description}"` : '') +
+              '\n';
+            log.info(ctx.reqId, 'Market context resolved', {
+              market: market.name,
+              hasDescription: !!market.description,
+            });
+          } else {
+            log.warn(ctx.reqId, 'Market not found', { marketId });
+          }
+        } else {
+          log.warn(ctx.reqId, 'No active market — evaluating without market context');
+        }
+
+        log.info(ctx.reqId, 'Starting evaluation', { total: signals.length });
         flush({ type: 'question', question, total: signals.length });
 
         if (!process.env.ANTHROPIC_API_KEY) {
@@ -300,13 +333,27 @@ export async function POST(req: Request): Promise<Response> {
           await Promise.all(
             batch.map(async (s) => {
               const content = await fetchContent(s);
+              log.info(ctx.reqId, 'Fetched content', {
+                id: s.id,
+                source: s.source,
+                contentLength: content.length,
+                hasContent: content.length > 0,
+              });
               const result = await evaluateOne(
                 client,
                 { ...s, content },
                 question,
+                marketContext,
+                ctx.reqId,
                 streamAbort.signal
               );
               if (result) {
+                log.info(ctx.reqId, 'Signal verdict', {
+                  id: result.id,
+                  verdict: result.recommendation,
+                  title: result.title.slice(0, 60),
+                  failed: result.reasoning === 'Evaluation failed for this signal.',
+                });
                 evaluations.push(result);
                 flush({ type: 'result', evaluation: result });
               }
@@ -359,6 +406,11 @@ Respond with ONLY valid JSON, no markdown:
                 messages: [{ role: 'user', content: synthPrompt }],
               },
               { signal: synthSignal }
+            );
+            logTokenCost(
+              ctx.reqId,
+              'evaluate-synthesis',
+              synthMsg.usage as Parameters<typeof logTokenCost>[2]
             );
             const lastText = [...synthMsg.content].reverse().find((b) => b.type === 'text');
             const rawText = lastText?.type === 'text' ? lastText.text.trim() : '{}';

@@ -862,12 +862,22 @@ export function OnboardContent() {
         return true;
       });
 
+      // Build the richest possible description for Claude's market filter.
+      // If the card description is missing (can happen on the fast steer path),
+      // synthesize one from the other card fields so the run agent always has
+      // specific context — the user never has to write anything.
+      const marketDescription =
+        pendingMarket.description?.trim() ||
+        [pendingMarket.market_name, pendingMarket.micro_niche, pendingMarket.overall_market]
+          .filter(Boolean)
+          .join('. ');
+
       const res = await fetch('/api/markets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: pendingMarket.niche,
-          description: pendingMarket.description,
+          description: marketDescription,
           sources: deduped,
         }),
       });

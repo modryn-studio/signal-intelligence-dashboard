@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { sql, getActiveMarketId } from '@/lib/db';
 import { createRouteLogger } from '@/lib/route-logger';
 import { timedAbort, AGENT_TIMEOUT_MS } from '@/lib/agent-guard';
+import { logTokenCost } from '@/lib/cost';
 
 import { getTodayQuestion } from '@/lib/utils';
 
@@ -300,7 +301,24 @@ export async function POST(req: Request): Promise<Response> {
     if (process.env.ANTHROPIC_API_KEY) {
       const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-      const itemsForPrompt = allItems.map(({ id, title, source, score, isCustomSource }) => ({
+      // Cap items sent to Claude — keeps prompt under ~8k tokens (~$0.02-0.04)
+      // vs sending all 160+ items (~$0.10+).
+      // Custom sources are capped at 40% of the budget so general sources always
+      // have representation even when a user has many active subreddits.
+      const MAX_ITEMS = 60;
+      const CUSTOM_CAP = Math.floor(MAX_ITEMS * 0.4); // 24 slots
+      const GENERAL_CAP = MAX_ITEMS - CUSTOM_CAP; // 36 slots
+      const customItemsAll = allItems.filter((i) => i.isCustomSource);
+      const generalItems = allItems
+        .filter((i) => !i.isCustomSource)
+        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+      // Custom items sorted by score so the strongest ones survive the cap
+      const customItemsCapped = customItemsAll
+        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+        .slice(0, CUSTOM_CAP);
+      const cappedItems = [...customItemsCapped, ...generalItems.slice(0, GENERAL_CAP)];
+
+      const itemsForPrompt = cappedItems.map(({ id, title, source, score, isCustomSource }) => ({
         id,
         title,
         source,
@@ -309,7 +327,7 @@ export async function POST(req: Request): Promise<Response> {
       }));
 
       // Build a readable source summary for the prompt header
-      const sourceCounts = allItems.reduce<Record<string, number>>((acc, item) => {
+      const sourceCounts = cappedItems.reduce<Record<string, number>>((acc, item) => {
         acc[item.source] = (acc[item.source] ?? 0) + 1;
         return acc;
       }, {});
@@ -319,7 +337,7 @@ export async function POST(req: Request): Promise<Response> {
 
       const prompt = `${marketContext}Today's focusing question: "${question}"
 
-Below are ${allItems.length} recent posts from: ${sourceList}.
+Below are ${cappedItems.length} recent posts from: ${sourceList}.
 
 Items marked market_specific:true are custom sources purpose-selected for this market during onboarding — treat them as the highest-signal inputs and always include at least the strongest 3 from them if they exist.
 
@@ -331,7 +349,10 @@ ${JSON.stringify(itemsForPrompt, null, 2)}
 Respond with ONLY valid JSON, no markdown fences, no explanation:
 {"selected":[{"id":"...","source_category":"complaints","note":"..."}]}`;
 
-      log.info(ctx.reqId, 'Calling claude-sonnet-4-6', { items: allItems.length });
+      log.info(ctx.reqId, 'Calling claude-sonnet-4-6', {
+        items: cappedItems.length,
+        total_fetched: allItems.length,
+      });
       const { signal: callSignal, clear } = timedAbort(AGENT_TIMEOUT_MS, req.signal);
       let message: Anthropic.Message;
       try {
@@ -347,6 +368,7 @@ Respond with ONLY valid JSON, no markdown fences, no explanation:
         clear();
       }
 
+      logTokenCost(ctx.reqId, 'run', message.usage as Parameters<typeof logTokenCost>[2]);
       const raw = message.content[0]?.type === 'text' ? message.content[0].text.trim() : '{}';
       let parsed: { selected?: ClaudeSelected[] } = {};
       try {

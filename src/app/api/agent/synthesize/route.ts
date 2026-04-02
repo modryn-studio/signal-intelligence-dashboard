@@ -11,6 +11,7 @@ export async function POST(request: Request): Promise<Response> {
   const { signal } = request;
   try {
     const body = await request.json().catch(() => ({}));
+    // Prefer client-supplied local date so server UTC never mismatches stored observation dates
     const date: string = body.date ?? new Date().toISOString().split('T')[0];
 
     const observations = (await sql`

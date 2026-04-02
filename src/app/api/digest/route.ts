@@ -14,13 +14,14 @@ function esc(s: string): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email } = body;
+    const { email, date } = body;
 
     if (!email) {
       return NextResponse.json({ error: 'email is required' }, { status: 400 });
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    // Prefer client-supplied local date so server UTC never mismatches stored signal dates
+    const today = date ?? new Date().toISOString().split('T')[0];
     const marketId = await getActiveMarketId();
 
     const [inputs, observations, truths] = await Promise.all([

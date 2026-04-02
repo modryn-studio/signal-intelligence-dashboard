@@ -13,6 +13,7 @@ import type { EvaluationResult, Synthesis, StreamChunk } from '@/app/api/agent/e
 
 interface CacheEntry {
   date: string;
+  status?: 'loading' | 'complete';
   evaluations: EvaluationResult[];
   synthesis: Synthesis | null;
   question: string;
@@ -260,6 +261,8 @@ export function EvaluateSignalsModal({
   const [isStreaming, setIsStreaming] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [isError, setIsError] = useState(false);
+  const [isWaitingForBackground, setIsWaitingForBackground] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [filter, setFilter] = useState<Filter>('observe');
   const [bulkAccepting, setBulkAccepting] = useState(false);
   const [bulkAcceptedIds, setBulkAcceptedIds] = useState<Set<number>>(new Set());
@@ -267,22 +270,48 @@ export function EvaluateSignalsModal({
   const [bulkRejectedIds, setBulkRejectedIds] = useState<Set<number>>(new Set());
   const abortRef = useRef<AbortController | null>(null);
 
+  const loadFromCache = (cached: CacheEntry) => {
+    setEvaluations(sortEvaluations(cached.evaluations, cached.synthesis?.priority_ids));
+    setSynthesis(cached.synthesis);
+    setQuestion(cached.question);
+    setTotal(cached.evaluations.length);
+    setIsStreaming(false);
+    setIsDone(true);
+    setIsError(false);
+    setIsWaitingForBackground(false);
+    setFilter('observe');
+    setBulkAcceptedIds(new Set());
+    setBulkRejectedIds(new Set());
+  };
+
+  const startPolling = () => {
+    // Background evaluate is in progress — poll every 2s until cache is populated
+    setIsWaitingForBackground(true);
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(() => {
+      const cached = readCache();
+      if (cached && cached.status !== 'loading' && cached.evaluations.length > 0) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = null;
+        loadFromCache(cached);
+      }
+    }, 2000);
+  };
+
   const runEvaluation = (forceRefresh = false) => {
     // Restore from cache if available and not a forced re-run
     if (!forceRefresh) {
       const cached = readCache();
-      if (cached && cached.evaluations.length > 0) {
-        setEvaluations(sortEvaluations(cached.evaluations, cached.synthesis?.priority_ids));
-        setSynthesis(cached.synthesis);
-        setQuestion(cached.question);
-        setTotal(cached.evaluations.length);
-        setIsStreaming(false);
-        setIsDone(true);
-        setIsError(false);
-        setFilter('observe');
-        setBulkAcceptedIds(new Set());
-        setBulkRejectedIds(new Set());
-        return;
+      if (cached) {
+        if (cached.status === 'loading') {
+          // Background evaluate is still streaming — wait for it, don't duplicate
+          startPolling();
+          return;
+        }
+        if (cached.evaluations.length > 0) {
+          loadFromCache(cached);
+          return;
+        }
       }
     }
 
@@ -305,7 +334,7 @@ export function EvaluateSignalsModal({
     fetch('/api/agent/evaluate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ date: localDateStr() }),
       signal: controller.signal,
     })
       .then(async (res) => {
@@ -367,9 +396,22 @@ export function EvaluateSignalsModal({
   };
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      setIsWaitingForBackground(false);
+      return;
+    }
     runEvaluation();
-    return () => abortRef.current?.abort();
+    return () => {
+      abortRef.current?.abort();
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
   }, [open]);
 
   const handleAccept = async (ev: EvaluationResult, title: string, body: string) => {
@@ -472,6 +514,24 @@ export function EvaluateSignalsModal({
         <div className="border-border shrink-0 border-b px-5 py-4">
           <p className="text-foreground font-mono text-sm tracking-widest uppercase">Evaluate</p>
         </div>
+
+        {/* Waiting for background evaluate — don't double-fire */}
+        {isWaitingForBackground && (
+          <div className="p-5">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Spinner className="h-3 w-3" />
+                <p className="text-muted-foreground font-mono text-xs">Evaluating in background…</p>
+              </div>
+              <div className="bg-border h-0.5 w-full overflow-hidden rounded-full">
+                <div className="bg-primary/40 h-full w-full animate-pulse rounded-full" />
+              </div>
+              <p className="text-muted-foreground/60 font-mono text-[10px]">
+                Results will appear here automatically when ready.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Streaming progress — visible while streaming, stays if no cards yet */}
         {isStreaming && evaluations.length === 0 && (

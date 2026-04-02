@@ -16,6 +16,7 @@ import { AddInputModal } from '@/components/add-input-modal';
 import { AddObservationModal } from '@/components/add-observation-modal';
 import { AgentRunModal } from '@/components/agent-run-modal';
 import { EvaluateSignalsModal } from '@/components/evaluate-signals-modal';
+import type { EvaluationResult, Synthesis, StreamChunk } from '@/app/api/agent/evaluate/route';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -222,16 +223,107 @@ export function SignalFeed({ selectedDate, isToday, shiftDay, marketId }: Signal
     setObserveModalOpen(true);
   };
 
-  const url =
+  // Always fetch all inputs for the day — filter client-side so tab switches are instant
+  // and count labels in the 'all' view are always ready without extra requests.
+  const url = `/api/inputs?date=${selectedDate}`;
+  const { data: allInputs, mutate } = useSWR<SignalInput[]>(url, fetcher, {
+    refreshInterval: 30000,
+  });
+  const inputs =
     activeCategory === 'all'
-      ? `/api/inputs?date=${selectedDate}`
-      : `/api/inputs?date=${selectedDate}&category=${activeCategory}`;
-
-  const { data: inputs, mutate } = useSWR<SignalInput[]>(url, fetcher, { refreshInterval: 30000 });
+      ? allInputs
+      : (allInputs ?? []).filter((i) => (i.source_category as Category) === activeCategory);
 
   const openAdd = (cat?: Category) => {
     setAddCategory(cat || 'trends');
     setAddModalOpen(true);
+  };
+
+  // Runs the evaluate stream in the background and writes to localStorage cache.
+  // Called automatically after Run Agent completes so clicking Evaluate is instant.
+  const runBackgroundEvaluate = async () => {
+    const today = selectedDate;
+    // Skip if today's cache already exists or is already loading
+    try {
+      const raw = localStorage.getItem('eval-cache');
+      if (raw) {
+        const entry = JSON.parse(raw) as { date: string; status?: string };
+        if (entry.date === today) return; // complete or in-progress for today
+      }
+    } catch {
+      // proceed
+    }
+    // Write loading sentinel immediately — prevents EvaluateSignalsModal from
+    // firing a duplicate call while the background stream is in progress.
+    try {
+      localStorage.setItem(
+        'eval-cache',
+        JSON.stringify({
+          date: today,
+          status: 'loading',
+          evaluations: [],
+          synthesis: null,
+          question: '',
+        })
+      );
+    } catch {
+      // storage unavailable — proceed anyway, just won't deduplicate
+    }
+    try {
+      const res = await fetch('/api/agent/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok || !res.body) return;
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      const evaluations: EvaluationResult[] = [];
+      let synthesis: Synthesis | null = null;
+      let question = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() ?? '';
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const chunk = JSON.parse(trimmed) as StreamChunk;
+            if (chunk.type === 'question') {
+              question = chunk.question;
+            } else if (chunk.type === 'result') {
+              evaluations.push(chunk.evaluation);
+            } else if (chunk.type === 'synthesis') {
+              synthesis = chunk.synthesis;
+            }
+          } catch {
+            // malformed line — skip
+          }
+        }
+      }
+
+      localStorage.setItem(
+        'eval-cache',
+        JSON.stringify({ date: selectedDate, evaluations, synthesis, question })
+      );
+    } catch {
+      // Background run failed — clear the loading sentinel so the modal can try again
+      try {
+        const raw = localStorage.getItem('eval-cache');
+        if (raw) {
+          const entry = JSON.parse(raw) as { date: string; status?: string };
+          if (entry.status === 'loading') localStorage.removeItem('eval-cache');
+        }
+      } catch {
+        // ignore
+      }
+    }
   };
 
   const runAgent = async (signal?: AbortSignal): Promise<{ logged: number }> => {
@@ -244,10 +336,13 @@ export function SignalFeed({ selectedDate, isToday, shiftDay, marketId }: Signal
     if (!res.ok) throw new Error('Failed');
     const data = (await res.json()) as { logged: number };
     await mutate();
+    // Pre-warm the evaluate cache in the background so clicking Evaluate is instant
+    void runBackgroundEvaluate();
     return data;
   };
 
-  const grouped = (inputs || []).reduce(
+  // grouped always uses the full set so category counts show in 'All' view
+  const grouped = (allInputs || []).reduce(
     (acc: Record<Category, SignalInput[]>, inp) => {
       const cat = inp.source_category as Category;
       if (!acc[cat]) acc[cat] = [];

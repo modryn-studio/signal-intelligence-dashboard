@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { localDateStr } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +32,7 @@ export function DigestModal({ open, onClose }: DigestModalProps) {
       const res = await fetch('/api/digest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: email.trim(), date: localDateStr() }),
       });
       if (!res.ok) throw new Error('Failed to generate digest');
       const data = await res.json();
