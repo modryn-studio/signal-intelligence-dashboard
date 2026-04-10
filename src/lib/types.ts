@@ -43,6 +43,7 @@ export interface Market {
   id: number;
   name: string;
   description: string | null;
+  broad_market: string | null;
   is_active: boolean;
   scan_status: ScanStatus;
   created_at: string;

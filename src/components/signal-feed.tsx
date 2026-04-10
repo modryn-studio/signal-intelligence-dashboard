@@ -219,6 +219,8 @@ export function SignalFeed({ selectedDate, isToday, shiftDay, marketId }: Signal
       // Claude's note → Details field (supporting context/evidence)
       body: input.notes ?? input.title,
       relatedInputIds: [input.id],
+      // Stamp with the date the signal belongs to, not necessarily today
+      date: selectedDate,
     });
     setObserveModalOpen(true);
   };
@@ -245,7 +247,7 @@ export function SignalFeed({ selectedDate, isToday, shiftDay, marketId }: Signal
     const today = selectedDate;
     // Skip if today's cache already exists or is already loading
     try {
-      const raw = localStorage.getItem('eval-cache');
+      const raw = localStorage.getItem(`eval-cache-${today}`);
       if (raw) {
         const entry = JSON.parse(raw) as { date: string; status?: string };
         if (entry.date === today) return; // complete or in-progress for today
@@ -257,7 +259,7 @@ export function SignalFeed({ selectedDate, isToday, shiftDay, marketId }: Signal
     // firing a duplicate call while the background stream is in progress.
     try {
       localStorage.setItem(
-        'eval-cache',
+        `eval-cache-${today}`,
         JSON.stringify({
           date: today,
           status: 'loading',
@@ -309,16 +311,16 @@ export function SignalFeed({ selectedDate, isToday, shiftDay, marketId }: Signal
       }
 
       localStorage.setItem(
-        'eval-cache',
+        `eval-cache-${selectedDate}`,
         JSON.stringify({ date: selectedDate, evaluations, synthesis, question })
       );
     } catch {
       // Background run failed — clear the loading sentinel so the modal can try again
       try {
-        const raw = localStorage.getItem('eval-cache');
+        const raw = localStorage.getItem(`eval-cache-${today}`);
         if (raw) {
           const entry = JSON.parse(raw) as { date: string; status?: string };
-          if (entry.status === 'loading') localStorage.removeItem('eval-cache');
+          if (entry.status === 'loading') localStorage.removeItem(`eval-cache-${today}`);
         }
       } catch {
         // ignore
@@ -389,7 +391,7 @@ export function SignalFeed({ selectedDate, isToday, shiftDay, marketId }: Signal
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {isToday && (
+          {isToday ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -408,6 +410,15 @@ export function SignalFeed({ selectedDate, isToday, shiftDay, marketId }: Signal
                 <DropdownMenuItem onClick={() => setEvaluateOpen(true)}>Evaluate</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-3 font-mono text-xs tracking-wider"
+              onClick={() => setEvaluateOpen(true)}
+            >
+              Evaluate
+            </Button>
           )}
           {isToday && (
             <Button
@@ -604,6 +615,7 @@ export function SignalFeed({ selectedDate, isToday, shiftDay, marketId }: Signal
         onClose={() => setEvaluateOpen(false)}
         onSignalDeleted={() => mutate()}
         onObservationSaved={() => mutate()}
+        initialDate={selectedDate}
       />
     </div>
   );

@@ -3,6 +3,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { localDateStr } from '@/lib/utils';
 import type { ExcavateChunk } from '@/app/api/agent/excavate/route';
@@ -115,7 +116,6 @@ function writeInterpretCache(key: string, markets: BroadMarket[]) {
 interface OnboardSession {
   step: Step;
   freeText: string;
-  confirmedBroadMarkets: string[];
   selectedMarketIndex: number | null;
 }
 
@@ -169,30 +169,6 @@ const PROMPTS = [
   'What\u2019s something you know more about than most people?',
 ] as const;
 
-const STEER_TAGS = [
-  'more technical',
-  'more niche',
-  'different industry',
-  'I use this daily',
-  'show me boring markets',
-  'B2B focus',
-  'more underserved',
-  'completely different',
-] as const;
-
-// Always-visible single-tap steer chips on Screen 2
-const QUICK_STEER_CHIPS = ['more niche', 'more proven', 'completely different'] as const;
-
-// Extended options behind "more options →" — excludes quick chips
-const EXTENDED_STEER_TAGS = [
-  'more technical',
-  'different industry',
-  'I use this daily',
-  'show me boring markets',
-  'B2B focus',
-  'more underserved',
-] as const;
-
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type Demand = 'proven' | 'growing' | 'crowded';
@@ -209,7 +185,7 @@ type MarketOption = {
   recommended_sources: { source_type: string; value: string }[];
 };
 
-type Step = 'interests' | 'confirm-broad' | 'picking' | 'sources';
+type Step = 'interests' | 'manual-create' | 'picking' | 'sources';
 
 // ── Sub-components ─────────────────────────────────────────────────────────
 
@@ -299,47 +275,7 @@ function SkeletonCard() {
     </div>
   );
 }
-// ── Excavate loading screen ──────────────────────────────────────────
 
-function ExcavateLoading({ onCancel }: { onCancel: () => void }) {
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    // Kick off after one frame so the transition fires
-    const id = requestAnimationFrame(() => setProgress(90));
-    return () => cancelAnimationFrame(id);
-  }, []);
-
-  return (
-    <div className="bg-background text-foreground flex min-h-svh flex-col items-center justify-center px-4 sm:px-6">
-      <div className="w-full max-w-sm">
-        <p className="text-primary font-mono text-[10px] tracking-widest uppercase">
-          Signal Intelligence
-        </p>
-        <h2 className="text-foreground mt-4 text-xl font-semibold">Digging into your markets…</h2>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Checking live demand signals — usually takes 45–60 seconds.
-        </p>
-        <div className="bg-border/50 mt-8 h-px w-full overflow-hidden">
-          <div
-            className="bg-primary h-full"
-            style={{
-              width: `${progress}%`,
-              transition: 'width 55s cubic-bezier(0.1, 0.05, 0.02, 1)',
-            }}
-          />
-        </div>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-muted-foreground/40 hover:text-muted-foreground mt-6 font-mono text-xs transition-colors"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-}
 // ── Main component ─────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
@@ -430,19 +366,9 @@ export function OnboardContent() {
   const [freeText, setFreeText] = useState('');
   const [promptIndex, setPromptIndex] = useState(() => Math.floor(Math.random() * PROMPTS.length));
   const [markets, setMarkets] = useState<MarketOption[]>([]);
-  const [originalMarkets, setOriginalMarkets] = useState<MarketOption[] | null>(null);
-  const [selectedSteer, setSelectedSteer] = useState<string[]>([]);
-  const [steerExpanded, setSteerExpanded] = useState(false);
-  const [activeQuickSteer, setActiveQuickSteer] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false); // full-screen loader (excavate in flight)
-  const [steerLoading, setSteerLoading] = useState(false); // dim cards during steer
+  const [loading, setLoading] = useState(false); // interests screen: interpret running
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
-  // Screen 1b: broad market confirmation
-  const [interpretLoading, setInterpretLoading] = useState(false);
-  const [broadMarkets, setBroadMarkets] = useState<BroadMarket[]>([]);
-  const [confirmedBroadMarkets, setConfirmedBroadMarkets] = useState<string[]>([]);
 
   // Screen 2: select-then-confirm
   const [selectedMarketIndex, setSelectedMarketIndex] = useState<number | null>(null);
@@ -453,6 +379,11 @@ export function OnboardContent() {
   const [sourceToggles, setSourceToggles] = useState<Record<string, boolean>>({});
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverDone, setDiscoverDone] = useState(false);
+  const [excavateDone, setExcavateDone] = useState(false);
+
+  // Path A: manual create
+  const [manualName, setManualName] = useState('');
+  const [manualCreatedMarketId, setManualCreatedMarketId] = useState<number | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -471,31 +402,21 @@ export function OnboardContent() {
     if (!s) return;
 
     setFreeText(s.freeText);
-    setConfirmedBroadMarkets(s.confirmedBroadMarkets ?? []);
     if (s.step === 'interests') return;
 
-    // Broad market confirmation step — restore interpret cache
-    if (s.step === 'confirm-broad') {
-      const key = s.freeText.trim().toLowerCase();
-      const cachedBroad = readInterpretCache(key);
-      if (cachedBroad?.length) {
-        setBroadMarkets(cachedBroad);
-        setStep('confirm-broad');
-      }
-      return;
-    }
+    // Path A manual create — no state to restore, stay on fork screen
+    if (s.step === 'manual-create') return;
 
-    // Markets must still be in the day-scoped excavate cache
-    const key = excavateCacheKey(s.confirmedBroadMarkets ?? [], s.freeText);
+    // Derive excavate cache key from interpret cache (broad markets come from interpret)
+    const interpretKey = s.freeText.trim().toLowerCase();
+    const cachedBroad = readInterpretCache(interpretKey);
+    const broadMarketsForKey = cachedBroad?.map((bm) => bm.market) ?? [];
+    const key = excavateCacheKey(broadMarketsForKey, s.freeText);
     const cachedMarkets = readExcavateCache(key);
     if (!cachedMarkets?.length) return; // cache expired — stay on interests with text restored
 
-    // Also restore broadMarkets so Back from Screen 2 → confirm-broad shows cards
-    const interpretKey = s.freeText.trim().toLowerCase();
-    const cachedBroad = readInterpretCache(interpretKey);
-    if (cachedBroad?.length) setBroadMarkets(cachedBroad);
-
     setMarkets(cachedMarkets);
+    setExcavateDone(true);
     setSelectedMarketIndex(s.selectedMarketIndex);
 
     if (s.step === 'sources' && s.selectedMarketIndex !== null) {
@@ -516,8 +437,8 @@ export function OnboardContent() {
 
   // Persist session whenever navigation state changes
   useEffect(() => {
-    writeSession({ step, freeText, confirmedBroadMarkets, selectedMarketIndex });
-  }, [step, freeText, confirmedBroadMarkets, selectedMarketIndex]);
+    writeSession({ step, freeText, selectedMarketIndex });
+  }, [step, freeText, selectedMarketIndex]);
 
   function appendChip(chip: string) {
     setFreeText((prev) => {
@@ -527,35 +448,23 @@ export function OnboardContent() {
     });
   }
 
-  function toggleBroadMarket(market: string) {
-    setConfirmedBroadMarkets((prev) => {
-      if (prev.includes(market)) return prev.filter((m) => m !== market);
-      if (prev.length >= 2) return prev; // cap at 2
-      return [...prev, market];
-    });
-  }
-
   async function doInterpret() {
     const text = freeText.trim();
-    if (!text) return;
-    if (interpretLoading) return;
-
+    if (!text || loading) return;
     setError('');
 
     // Check localStorage cache
     const key = text.toLowerCase();
     const cached = readInterpretCache(key);
     if (cached?.length) {
-      setBroadMarkets(cached);
-      setConfirmedBroadMarkets([]);
-      setStep('confirm-broad');
+      void doExcavate(cached.map((bm) => bm.market));
       return;
     }
 
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
-    setInterpretLoading(true);
+    setLoading(true);
 
     try {
       const res = await fetch('/api/agent/interpret', {
@@ -587,10 +496,8 @@ export function OnboardContent() {
             if (chunk.type === 'market') {
               arrived.push(chunk.data);
             } else if (chunk.type === 'done') {
-              setBroadMarkets(arrived);
-              setConfirmedBroadMarkets([]);
               writeInterpretCache(key, arrived);
-              setStep('confirm-broad');
+              void doExcavate(arrived.map((bm) => bm.market));
             } else if (chunk.type === 'error') {
               setError(chunk.message ?? 'Something went wrong.');
             }
@@ -603,66 +510,38 @@ export function OnboardContent() {
       if (err instanceof DOMException && err.name === 'AbortError') return;
       setError('Something went wrong. Try again.');
     } finally {
-      setInterpretLoading(false);
+      setLoading(false);
     }
   }
 
-  function toggleSteer(tag: string) {
-    setSelectedSteer((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  }
-
-  async function doExcavate(steerOverride?: string[]) {
+  async function doExcavate(broadMarketsInput: string[]) {
     setError('');
+    if (!broadMarketsInput.length && !freeText.trim()) return;
 
-    const activeSteer = steerOverride ?? (selectedSteer.length ? selectedSteer : undefined);
-    // Steer path: already have markets — cheap mutation, stay on picking screen
-    const isSteer = !!(activeSteer?.length && markets.length > 0);
-
-    // Hard guards — these protect against double-tap, race conditions, and
-    // state-transition edge cases that the UI disabled prop can't fully prevent
-    if (!isSteer && loading) return;
-    if (isSteer && steerLoading) return;
-    if (!confirmedBroadMarkets.length && !freeText.trim()) return; // nothing to send
-    // Check localStorage cache for non-steer runs
-    if (!isSteer) {
-      const key = excavateCacheKey(confirmedBroadMarkets, freeText);
-      const cached = readExcavateCache(key);
-      if (cached?.length) {
-        setMarkets(cached);
-        setStep('picking');
-        return;
-      }
+    const key = excavateCacheKey(broadMarketsInput, freeText);
+    const cached = readExcavateCache(key);
+    if (cached?.length) {
+      setMarkets(cached);
+      setExcavateDone(true);
+      setStep('picking');
+      return;
     }
 
-    // Snapshot markets before clearing — needed to restore if steer aborts or errors
-    const prevMarkets = markets;
-    // Save original cards the first time a steer fires so user can return to them
-    if (isSteer && !originalMarkets) setOriginalMarkets(markets);
-
-    // Abort any in-flight request
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
-    if (isSteer) {
-      setSteerLoading(true);
-      setMarkets([]);
-    } else {
-      setLoading(true);
-      setMarkets([]);
-    }
+    setMarkets([]);
+    setExcavateDone(false);
+    setStep('picking');
 
     try {
       const res = await fetch('/api/agent/excavate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          broadMarkets: confirmedBroadMarkets,
+          broadMarkets: broadMarketsInput,
           description: freeText.trim() || undefined,
-          steer: activeSteer,
-          existingMarkets: isSteer ? markets : undefined,
         }),
         signal: controller.signal,
       });
@@ -672,7 +551,6 @@ export function OnboardContent() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      let transitioned = false;
       const arrived: MarketOption[] = [];
 
       while (true) {
@@ -690,27 +568,10 @@ export function OnboardContent() {
             if (chunk.type === 'market') {
               arrived.push(chunk.data);
               setMarkets([...arrived]);
-              if (!transitioned) {
-                transitioned = true;
-                setLoading(false);
-                setSteerLoading(false);
-                if (!isSteer) setStep('picking');
-              }
             } else if (chunk.type === 'done') {
-              setSteerExpanded(false);
-              setSelectedSteer([]);
-              setSteerLoading(false);
-              if (isSteer) {
-                setSelectedMarketIndex(null);
-              } else {
-                const key = excavateCacheKey(confirmedBroadMarkets, freeText);
-                writeExcavateCache(key, arrived);
-              }
+              writeExcavateCache(key, arrived);
             } else if (chunk.type === 'error') {
               setError(chunk.message ?? 'Something went wrong.');
-              if (isSteer) setMarkets(prevMarkets);
-              setLoading(false);
-              setSteerLoading(false);
             }
           } catch {
             /* ignore non-JSON lines */
@@ -718,17 +579,10 @@ export function OnboardContent() {
         }
       }
     } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        if (isSteer) setMarkets(prevMarkets);
-        return;
-      }
-      if (isSteer) setMarkets(prevMarkets);
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       setError('Something went wrong. Try again.');
-    } finally {
-      setLoading(false);
-      setSteerLoading(false);
-      setActiveQuickSteer(null);
     }
+    setExcavateDone(true);
   }
 
   // Fetch + stream sources for a market. Called by handleContinue and by the
@@ -830,6 +684,51 @@ export function OnboardContent() {
 
   // Screen 3 → Dashboard: create market + start scanning
   async function handleStartScanning() {
+    // Path A: market already created — add sources + fire agent
+    if (manualCreatedMarketId) {
+      setSaving(true);
+      setError('');
+      try {
+        const enabledDiscovered = discoveredSources.filter(
+          (src) => sourceToggles[`${src.source_type}:${src.value}`] !== false
+        );
+        for (const src of enabledDiscovered) {
+          await fetch('/api/markets', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: manualCreatedMarketId,
+              addSource: {
+                source_type: src.source_type,
+                value: src.value,
+                display_name: src.display_name,
+                description: src.description,
+                status: src.status,
+              },
+            }),
+          });
+        }
+
+        // Fire agent silently
+        fetch('/api/agent/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            today: new Date().toISOString().slice(0, 10),
+            marketId: manualCreatedMarketId,
+          }),
+        }).catch(() => {});
+
+        clearSession();
+        router.push(`/market/${manualCreatedMarketId}`);
+      } catch {
+        setError('Something went wrong. Try again.');
+        setSaving(false);
+      }
+      return;
+    }
+
+    // Path B: create market from pending excavate card
     if (!pendingMarket) return;
     setSaving(true);
     setError('');
@@ -862,22 +761,12 @@ export function OnboardContent() {
         return true;
       });
 
-      // Build the richest possible description for Claude's market filter.
-      // If the card description is missing (can happen on the fast steer path),
-      // synthesize one from the other card fields so the run agent always has
-      // specific context — the user never has to write anything.
-      const marketDescription =
-        pendingMarket.description?.trim() ||
-        [pendingMarket.market_name, pendingMarket.micro_niche, pendingMarket.overall_market]
-          .filter(Boolean)
-          .join('. ');
-
       const res = await fetch('/api/markets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: pendingMarket.niche,
-          description: marketDescription,
+          name: pendingMarket.overall_market,
+          description: pendingMarket.description?.trim() || null,
           sources: deduped,
         }),
       });
@@ -902,26 +791,98 @@ export function OnboardContent() {
     }
   }
 
+  // Path A: create market + transition to source discovery
+  async function handleManualCreate() {
+    const name = manualName.trim();
+    if (!name) return;
+    setSaving(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/markets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) throw new Error();
+      const { market: created } = (await res.json()) as { market: { id: number } };
+      setManualCreatedMarketId(created.id);
+
+      // Transition to source discovery
+      setDiscoveredSources([]);
+      setSourceToggles({});
+      setDiscoverDone(false);
+      setStep('sources');
+
+      // Start discover-sources streaming
+      setDiscoverLoading(true);
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      try {
+        const discoverRes = await fetch('/api/agent/discover-sources', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ market_name: name }),
+          signal: controller.signal,
+        });
+
+        if (!discoverRes.ok || !discoverRes.body) throw new Error();
+
+        const reader = discoverRes.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        const arrived: DiscoveredSource[] = [];
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            try {
+              const chunk = JSON.parse(trimmed) as DiscoverSourcesChunk;
+              if (chunk.type === 'source') {
+                arrived.push(chunk.data);
+                setDiscoveredSources([...arrived]);
+                setSourceToggles((prev) => ({
+                  ...prev,
+                  [`${chunk.data.source_type}:${chunk.data.value}`]: true,
+                }));
+              } else if (chunk.type === 'done') {
+                setDiscoverDone(true);
+              } else if (chunk.type === 'error') {
+                setError(chunk.message ?? 'Source discovery failed.');
+                setDiscoverDone(true);
+              }
+            } catch {
+              /* ignore non-JSON */
+            }
+          }
+        }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setDiscoverDone(true);
+      } finally {
+        setDiscoverLoading(false);
+      }
+    } catch {
+      setError('Something went wrong. Try again.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function handleSkip() {
     router.push('/');
   }
 
-  // ── Loading ─────────────────────────────────────────────────────────────
-
-  if (loading) {
-    return (
-      <ExcavateLoading
-        onCancel={() => {
-          abortRef.current?.abort();
-          setLoading(false);
-          // Go back to where the user was — confirm-broad if they had markets, else interests
-          setStep(broadMarkets.length > 0 ? 'confirm-broad' : 'interests');
-        }}
-      />
-    );
-  }
-
-  // ── Screen 1 — Interests ─────────────────────────────────────────────────
+  // ── Screen 1 — Fork: "I know my market" vs "Help me find one" ──────────
 
   if (step === 'interests') {
     const canProceed = freeText.trim().length > 0;
@@ -933,122 +894,114 @@ export function OnboardContent() {
             Signal Intelligence
           </p>
 
-          {/* Rotating conversational prompt */}
           <h1 className="text-foreground mt-4 text-2xl leading-snug font-semibold">
-            {PROMPTS[promptIndex]}
+            What market are you watching?
           </h1>
-          <button
+
+          {/* Path A — manual create */}
+          <Button
             type="button"
-            onClick={() => setPromptIndex((i) => (i + 1) % PROMPTS.length)}
-            className="text-muted-foreground/50 hover:text-muted-foreground mt-1.5 text-xs transition-colors"
+            onClick={() => setStep('manual-create')}
+            className="mt-6 w-full rounded-none"
           >
-            Try a different question →
-          </button>
+            I know my market →
+          </Button>
 
-          {/* Free text textarea */}
-          <Textarea
-            value={freeText}
-            onChange={(e) => setFreeText(e.target.value)}
-            placeholder="e.g. I'm obsessed with personal finance, I hate how complicated taxes are, I play guitar on weekends..."
-            className="mt-5 min-h-25 resize-none rounded-none text-sm"
-            rows={4}
-          />
+          {/* Path B — guided excavation */}
+          <div className="mt-10">
+            <p className="text-muted-foreground text-xs">Not sure yet?</p>
 
-          {/* Suggestion chips */}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {SUGGESTION_CHIPS.map((chip) => (
-              <button
-                key={chip}
-                type="button"
-                onClick={() => appendChip(chip)}
-                className="border-border text-muted-foreground hover:border-muted-foreground rounded-full border px-3 py-1.5 font-mono text-xs transition-colors"
-              >
-                {chip}
-              </button>
-            ))}
-          </div>
+            {/* Rotating conversational prompt */}
+            <h2 className="text-foreground mt-2 text-lg leading-snug font-semibold">
+              {PROMPTS[promptIndex]}
+            </h2>
+            <button
+              type="button"
+              onClick={() => setPromptIndex((i) => (i + 1) % PROMPTS.length)}
+              className="text-muted-foreground/50 hover:text-muted-foreground mt-1.5 text-xs transition-colors"
+            >
+              Try a different question →
+            </button>
 
-          {error && <p className="text-destructive mt-2 text-xs">{error}</p>}
+            {/* Free text textarea */}
+            <Textarea
+              value={freeText}
+              onChange={(e) => setFreeText(e.target.value)}
+              placeholder="e.g. I'm obsessed with personal finance, I hate how complicated taxes are, I play guitar on weekends..."
+              className="mt-4 min-h-25 resize-none rounded-none text-sm"
+              rows={4}
+            />
 
-          <div className="mt-7 flex flex-col items-center gap-3">
+            {/* Suggestion chips */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {SUGGESTION_CHIPS.map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => appendChip(chip)}
+                  className="border-border text-muted-foreground hover:border-muted-foreground rounded-full border px-3 py-1.5 font-mono text-xs transition-colors"
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+
+            {error && <p className="text-destructive mt-2 text-xs">{error}</p>}
+
             <Button
               type="button"
               onClick={() => doInterpret()}
-              disabled={!canProceed || interpretLoading}
-              className="w-full rounded-none"
+              disabled={!canProceed || loading}
+              className="mt-5 w-full rounded-none"
+              variant="secondary"
             >
-              {interpretLoading ? 'Reading your interests…' : 'Find my markets →'}
+              {loading ? 'Reading your interests…' : 'Help me find one →'}
             </Button>
-            <button
-              type="button"
-              onClick={handleSkip}
-              className="text-muted-foreground/50 hover:text-muted-foreground text-xs transition-colors"
-            >
-              Already have a market? Skip →
-            </button>
           </div>
         </div>
       </div>
     );
   }
 
-  // ── Screen 1b — Confirm Broad Markets ────────────────────────────────────
+  // ── Path A — Manual Create ───────────────────────────────────────────────
 
-  if (step === 'confirm-broad') {
-    const canDig = confirmedBroadMarkets.length >= 1;
+  if (step === 'manual-create') {
+    const canCreate = manualName.trim().length > 0;
 
     return (
       <div className="bg-background text-foreground flex min-h-svh flex-col items-center justify-center px-4 py-16 sm:px-6">
         <div className="w-full max-w-sm">
           <button
             type="button"
-            onClick={() => {
-              abortRef.current?.abort();
-              setStep('interests');
-            }}
+            onClick={() => setStep('interests')}
             className="text-muted-foreground/50 hover:text-muted-foreground text-xs transition-colors"
           >
             ← Back
           </button>
 
-          <h2 className="text-foreground mt-4 text-xl leading-snug font-semibold">
-            Which of these resonate?
+          <p className="text-primary mt-4 font-mono text-[10px] tracking-widest uppercase">
+            Signal Intelligence
+          </p>
+          <h2 className="text-foreground mt-2 text-xl leading-snug font-semibold">
+            Name your market
           </h2>
-          <p className="text-muted-foreground mt-1 text-xs">Pick up to 2.</p>
 
-          <div className="mt-5 flex flex-col gap-3">
-            {broadMarkets.map((bm) => {
-              const active = confirmedBroadMarkets.includes(bm.market);
-              return (
-                <button
-                  key={bm.market}
-                  type="button"
-                  onClick={() => toggleBroadMarket(bm.market)}
-                  disabled={!active && confirmedBroadMarkets.length >= 2}
-                  className={`w-full rounded border p-4 text-left transition-colors ${
-                    active
-                      ? 'border-primary ring-primary/20 ring-2'
-                      : confirmedBroadMarkets.length >= 2
-                        ? 'border-border cursor-not-allowed opacity-35'
-                        : 'border-border hover:border-primary/50'
-                  }`}
-                >
-                  <p className="text-foreground text-sm font-semibold">{bm.market}</p>
-                  <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{bm.reason}</p>
-                </button>
-              );
-            })}
-          </div>
+          <Input
+            value={manualName}
+            onChange={(e) => setManualName(e.target.value)}
+            placeholder="e.g. Algorithmic Trading, Creator Economy, Dental SaaS"
+            className="mt-5 rounded-none text-sm"
+          />
 
-          {error && <p className="text-destructive mt-3 text-xs">{error}</p>}
+          {error && <p className="text-destructive mt-2 text-xs">{error}</p>}
 
           <Button
             type="button"
-            onClick={() => doExcavate()}
-            disabled={!canDig || loading}
+            onClick={handleManualCreate}
+            disabled={!canCreate || saving}
             className="mt-6 w-full rounded-none"
           >
-            Dig deeper →
+            {saving ? 'Creating…' : 'Create market →'}
           </Button>
         </div>
       </div>
@@ -1066,7 +1019,8 @@ export function OnboardContent() {
             onClick={() => {
               abortRef.current?.abort();
               setSelectedMarketIndex(null);
-              setStep('confirm-broad');
+              setMarkets([]);
+              setStep('interests');
             }}
             className="text-muted-foreground/50 hover:text-muted-foreground text-xs transition-colors"
           >
@@ -1085,7 +1039,7 @@ export function OnboardContent() {
                 market={market}
                 onSelect={() => setSelectedMarketIndex(i)}
                 selected={selectedMarketIndex === i}
-                disabled={steerLoading}
+                disabled={!excavateDone}
               />
             ))}
             {/* Skeleton cards while stream in flight */}
@@ -1095,7 +1049,7 @@ export function OnboardContent() {
           </div>
 
           {/* Continue button — visible when a card is selected */}
-          {selectedMarketIndex !== null && !steerLoading && (
+          {selectedMarketIndex !== null && (
             <Button
               type="button"
               onClick={handleContinue}
@@ -1106,104 +1060,6 @@ export function OnboardContent() {
           )}
 
           {error && <p className="text-destructive mt-3 text-xs">{error}</p>}
-
-          {/* Refine — always visible once markets are loaded */}
-          {markets.length > 0 && (
-            <div className="mt-6">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <span className="text-muted-foreground/40 font-mono text-[10px]">Refine:</span>
-                {QUICK_STEER_CHIPS.map((chip) => {
-                  const isActive = steerLoading && activeQuickSteer === chip;
-                  return (
-                    <button
-                      key={chip}
-                      type="button"
-                      disabled={steerLoading}
-                      onClick={() => {
-                        setActiveQuickSteer(chip);
-                        void doExcavate([chip]);
-                      }}
-                      className={`font-mono text-xs transition-colors disabled:pointer-events-none ${
-                        isActive
-                          ? 'text-primary'
-                          : 'text-muted-foreground/50 hover:text-muted-foreground'
-                      }`}
-                    >
-                      {isActive ? '…' : chip}
-                    </button>
-                  );
-                })}
-                {originalMarkets && !steerLoading && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMarkets(originalMarkets);
-                      setOriginalMarkets(null);
-                      setSelectedMarketIndex(null);
-                    }}
-                    className="text-muted-foreground/30 hover:text-muted-foreground font-mono text-[10px] transition-colors"
-                  >
-                    ← original
-                  </button>
-                )}
-                {steerLoading && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      abortRef.current?.abort();
-                      setSteerLoading(false);
-                      setActiveQuickSteer(null);
-                    }}
-                    className="text-muted-foreground/30 hover:text-muted-foreground font-mono text-[10px] transition-colors"
-                  >
-                    cancel
-                  </button>
-                )}
-              </div>
-
-              {!steerLoading && (
-                <button
-                  type="button"
-                  onClick={() => setSteerExpanded((v) => !v)}
-                  className="text-muted-foreground/30 hover:text-muted-foreground mt-2 font-mono text-[10px] transition-colors"
-                >
-                  {steerExpanded ? '↑ less' : 'more options →'}
-                </button>
-              )}
-
-              {steerExpanded && !steerLoading && (
-                <div className="mt-3">
-                  <div className="flex flex-wrap gap-2">
-                    {EXTENDED_STEER_TAGS.map((tag) => {
-                      const active = selectedSteer.includes(tag);
-                      return (
-                        <button
-                          key={tag}
-                          type="button"
-                          onClick={() => toggleSteer(tag)}
-                          className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors ${
-                            active
-                              ? 'border-primary text-primary bg-primary/10'
-                              : 'border-border text-muted-foreground hover:border-muted-foreground'
-                          }`}
-                        >
-                          {tag}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={() => doExcavate()}
-                    disabled={selectedSteer.length === 0}
-                    className="mt-3 rounded-none"
-                  >
-                    Try these →
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
     );
@@ -1211,30 +1067,35 @@ export function OnboardContent() {
 
   // ── Screen 3 — Sources ──────────────────────────────────────────────────
 
-  if (step === 'sources' && pendingMarket) {
+  if (step === 'sources' && (pendingMarket || manualCreatedMarketId)) {
+    const sourcesLabel = pendingMarket?.niche ?? manualName.trim();
+    const isPathA = !!manualCreatedMarketId;
+
     return (
       // Flex column fills the viewport — sources list scrolls, CTA stays at bottom
       <div className="bg-background text-foreground flex min-h-svh flex-col px-4 sm:px-6">
         <div className="mx-auto flex w-full max-w-sm flex-1 flex-col py-14">
-          <button
-            type="button"
-            onClick={() => {
-              abortRef.current?.abort();
-              setStep('picking');
-              setPendingMarket(null);
-              setDiscoveredSources([]);
-              setSourceToggles({});
-              setDiscoverLoading(false);
-              setDiscoverDone(false);
-              setError('');
-            }}
-            className="text-muted-foreground/50 hover:text-muted-foreground -ml-1 self-start py-1 pl-1 text-xs transition-colors"
-          >
-            ← Back
-          </button>
+          {!isPathA && (
+            <button
+              type="button"
+              onClick={() => {
+                abortRef.current?.abort();
+                setStep('picking');
+                setPendingMarket(null);
+                setDiscoveredSources([]);
+                setSourceToggles({});
+                setDiscoverLoading(false);
+                setDiscoverDone(false);
+                setError('');
+              }}
+              className="text-muted-foreground/50 hover:text-muted-foreground -ml-1 self-start py-1 pl-1 text-xs transition-colors"
+            >
+              ← Back
+            </button>
+          )}
 
           <p className="text-primary mt-4 font-mono text-[10px] tracking-widest uppercase">
-            {pendingMarket.niche}
+            {sourcesLabel}
           </p>
           <h2 className="text-foreground mt-2 text-xl leading-snug font-semibold">
             Signal sources

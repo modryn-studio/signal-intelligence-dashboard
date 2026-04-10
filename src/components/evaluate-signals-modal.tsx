@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { mutate as globalMutate } from 'swr';
-import { ChevronDownIcon, ChevronRightIcon, ExternalLinkIcon } from 'lucide-react';
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
@@ -19,14 +19,15 @@ interface CacheEntry {
   question: string;
 }
 
-const CACHE_KEY = 'eval-cache';
+function cacheKey(date: string) {
+  return `eval-cache-${date}`;
+}
 
-function readCache(): CacheEntry | null {
+function readCache(date: string): CacheEntry | null {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(cacheKey(date));
     if (!raw) return null;
-    const entry = JSON.parse(raw) as CacheEntry;
-    return entry.date === localDateStr() ? entry : null;
+    return JSON.parse(raw) as CacheEntry;
   } catch {
     return null;
   }
@@ -34,7 +35,7 @@ function readCache(): CacheEntry | null {
 
 function writeCache(entry: CacheEntry) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(entry));
+    localStorage.setItem(cacheKey(entry.date), JSON.stringify(entry));
   } catch {
     // storage full or unavailable — silently skip
   }
@@ -231,6 +232,7 @@ interface Props {
   onClose: () => void;
   onSignalDeleted: () => void;
   onObservationSaved: () => void;
+  initialDate?: string;
 }
 
 function sortEvaluations(evals: EvaluationResult[], priorityIds?: number[]): EvaluationResult[] {
@@ -253,7 +255,9 @@ export function EvaluateSignalsModal({
   onClose,
   onSignalDeleted,
   onObservationSaved,
+  initialDate,
 }: Props) {
+  const [selectedDate, setSelectedDate] = useState(() => initialDate ?? localDateStr());
   const [evaluations, setEvaluations] = useState<EvaluationResult[]>([]);
   const [synthesis, setSynthesis] = useState<Synthesis | null>(null);
   const [question, setQuestion] = useState('');
@@ -270,6 +274,17 @@ export function EvaluateSignalsModal({
   const [bulkRejectedIds, setBulkRejectedIds] = useState<Set<number>>(new Set());
   const abortRef = useRef<AbortController | null>(null);
 
+  const today = localDateStr();
+  const isToday = selectedDate === today;
+
+  const shiftDate = (days: number) => {
+    const d = new Date(selectedDate + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    const next = localDateStr(d);
+    if (next > today) return; // can't go past today
+    setSelectedDate(next);
+  };
+
   const loadFromCache = (cached: CacheEntry) => {
     setEvaluations(sortEvaluations(cached.evaluations, cached.synthesis?.priority_ids));
     setSynthesis(cached.synthesis);
@@ -284,12 +299,12 @@ export function EvaluateSignalsModal({
     setBulkRejectedIds(new Set());
   };
 
-  const startPolling = () => {
+  const startPolling = (date: string) => {
     // Background evaluate is in progress — poll every 2s until cache is populated
     setIsWaitingForBackground(true);
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(() => {
-      const cached = readCache();
+      const cached = readCache(date);
       if (cached && cached.status !== 'loading' && cached.evaluations.length > 0) {
         if (pollRef.current) clearInterval(pollRef.current);
         pollRef.current = null;
@@ -298,14 +313,14 @@ export function EvaluateSignalsModal({
     }, 2000);
   };
 
-  const runEvaluation = (forceRefresh = false) => {
+  const runEvaluation = (date: string, forceRefresh = false) => {
     // Restore from cache if available and not a forced re-run
     if (!forceRefresh) {
-      const cached = readCache();
+      const cached = readCache(date);
       if (cached) {
         if (cached.status === 'loading') {
           // Background evaluate is still streaming — wait for it, don't duplicate
-          startPolling();
+          startPolling(date);
           return;
         }
         if (cached.evaluations.length > 0) {
@@ -334,7 +349,7 @@ export function EvaluateSignalsModal({
     fetch('/api/agent/evaluate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date: localDateStr() }),
+      body: JSON.stringify({ date }),
       signal: controller.signal,
     })
       .then(async (res) => {
@@ -376,11 +391,11 @@ export function EvaluateSignalsModal({
 
         setIsStreaming(false);
         setIsDone(true);
-        // Persist so reopening today doesn't re-run the stream
+        // Persist so reopening this date doesn't re-run the stream
         setEvaluations((prev) => {
           setSynthesis((syn) => {
             setQuestion((q) => {
-              writeCache({ date: localDateStr(), evaluations: prev, synthesis: syn, question: q });
+              writeCache({ date, evaluations: prev, synthesis: syn, question: q });
               return q;
             });
             return syn;
@@ -395,6 +410,12 @@ export function EvaluateSignalsModal({
       });
   };
 
+  // Sync selectedDate to initialDate each time the modal opens
+  useEffect(() => {
+    if (open && initialDate) setSelectedDate(initialDate);
+  }, [open, initialDate]);
+
+  // Re-run when modal opens or selected date changes
   useEffect(() => {
     if (!open) {
       if (pollRef.current) {
@@ -404,7 +425,7 @@ export function EvaluateSignalsModal({
       setIsWaitingForBackground(false);
       return;
     }
-    runEvaluation();
+    runEvaluation(selectedDate);
     return () => {
       abortRef.current?.abort();
       if (pollRef.current) {
@@ -412,7 +433,7 @@ export function EvaluateSignalsModal({
         pollRef.current = null;
       }
     };
-  }, [open]);
+  }, [open, selectedDate]);
 
   const handleAccept = async (ev: EvaluationResult, title: string, body: string) => {
     await fetch('/api/observations', {
@@ -423,12 +444,21 @@ export function EvaluateSignalsModal({
         body,
         related_input_ids: [ev.id],
         tags: [],
-        date: localDateStr(),
+        date: selectedDate,
       }),
     });
     onObservationSaved();
     void globalMutate('/api/observations?limit=20');
     void globalMutate('/api/stats');
+    // Auto-close when the last observe card is accepted
+    setBulkAcceptedIds((prev) => {
+      const next = new Set(prev).add(ev.id);
+      const observeIds = evaluations.filter((e) => e.recommendation === 'observe').map((e) => e.id);
+      if (observeIds.length > 0 && observeIds.every((id) => next.has(id))) {
+        setTimeout(() => onClose(), 1200);
+      }
+      return next;
+    });
   };
 
   const handleDelete = async (ev: EvaluationResult) => {
@@ -453,7 +483,7 @@ export function EvaluateSignalsModal({
           body: ev.proposed_body,
           related_input_ids: [ev.id],
           tags: [],
-          date: localDateStr(),
+          date: selectedDate,
         }),
       });
       if (res.ok) {
@@ -465,6 +495,8 @@ export function EvaluateSignalsModal({
     setBulkAccepting(false);
     void globalMutate('/api/observations?limit=20');
     void globalMutate('/api/stats');
+    // Auto-close after bulk accept
+    if (accepted.size > 0) setTimeout(() => onClose(), 1200);
   };
 
   const handleDeleteAllNoise = async () => {
@@ -485,7 +517,7 @@ export function EvaluateSignalsModal({
       const next = prev.filter((e) => !deleted.has(e.id));
       setSynthesis((syn) => {
         setQuestion((q) => {
-          writeCache({ date: localDateStr(), evaluations: next, synthesis: syn, question: q });
+          writeCache({ date: selectedDate, evaluations: next, synthesis: syn, question: q });
           return q;
         });
         return syn;
@@ -512,7 +544,30 @@ export function EvaluateSignalsModal({
         <DialogTitle className="sr-only">Evaluate Signals</DialogTitle>
         {/* Fixed header */}
         <div className="border-border shrink-0 border-b px-5 py-4">
-          <p className="text-foreground font-mono text-sm tracking-widest uppercase">Evaluate</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-foreground font-mono text-sm tracking-widest uppercase">Evaluate</p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => shiftDate(-1)}
+                disabled={isStreaming || isWaitingForBackground}
+                className="text-muted-foreground hover:text-foreground rounded p-0.5 transition-colors disabled:opacity-30"
+                aria-label="Previous day"
+              >
+                <ChevronLeftIcon className="h-3.5 w-3.5" />
+              </button>
+              <span className="text-muted-foreground font-mono text-[10px] tabular-nums">
+                {isToday ? 'today' : selectedDate}
+              </span>
+              <button
+                onClick={() => shiftDate(1)}
+                disabled={isToday || isStreaming || isWaitingForBackground}
+                className="text-muted-foreground hover:text-foreground rounded p-0.5 transition-colors disabled:opacity-30"
+                aria-label="Next day"
+              >
+                <ChevronRightIcon className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Waiting for background evaluate — don't double-fire */}

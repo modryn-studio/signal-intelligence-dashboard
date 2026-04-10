@@ -230,8 +230,8 @@ export async function POST(req: Request): Promise<Response> {
 
     if (marketId) {
       const [market] = (await sql`
-        SELECT name, description FROM markets WHERE id = ${marketId}
-      `) as { name: string; description: string | null }[];
+        SELECT name FROM markets WHERE id = ${marketId}
+      `) as { name: string }[];
       const sourcesRows = (await sql`
         SELECT id, source_type, value FROM market_sources WHERE market_id = ${marketId} AND enabled = true
       `) as { id: number; source_type: string; value: string }[];
@@ -239,9 +239,7 @@ export async function POST(req: Request): Promise<Response> {
         .filter((r) => r.source_type === 'subreddit')
         .map((r) => r.value);
       if (market) {
-        marketContext = `The builder is researching the **${market.name}** market.${
-          market.description ? ` ${market.description}` : ''
-        } Select only signals directly relevant to this market — discard anything that doesn't fit.\n\n`;
+        marketContext = `The builder is watching the **${market.name}** market. Select only signals relevant to this market — discard anything outside it.\n\n`;
         log.info(ctx.reqId, 'Market context', {
           market: market.name,
           customSubreddits,
@@ -305,6 +303,7 @@ export async function POST(req: Request): Promise<Response> {
       // vs sending all 160+ items (~$0.10+).
       // Custom sources are capped at 40% of the budget so general sources always
       // have representation even when a user has many active subreddits.
+      // Claude's market context filter handles relevance — the cap is cost control only.
       const MAX_ITEMS = 60;
       const CUSTOM_CAP = Math.floor(MAX_ITEMS * 0.4); // 24 slots
       const GENERAL_CAP = MAX_ITEMS - CUSTOM_CAP; // 36 slots

@@ -1,6 +1,6 @@
 ﻿import Anthropic from '@anthropic-ai/sdk';
 import { createRouteLogger } from '@/lib/route-logger';
-import { timedAbort, AGENT_TIMEOUT_MS, WEB_SEARCH_TIMEOUT_MS } from '@/lib/agent-guard';
+import { timedAbort, AGENT_TIMEOUT_MS } from '@/lib/agent-guard';
 import { logTokenCost } from '@/lib/cost';
 
 const log = createRouteLogger('agent-excavate');
@@ -22,8 +22,6 @@ interface MarketOption {
 interface ExcavateBody {
   broadMarkets: string[];
   description?: string;
-  steer?: string[];
-  existingMarkets?: MarketOption[];
 }
 
 export type ExcavateChunk =
@@ -59,7 +57,7 @@ function setToCache(key: string, markets: MarketOption[]): void {
 }
 
 // â"€â"€ In-flight deduplication â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-// Prevents N identical requests from spawning N × 4 Claude web_search calls.
+// Prevents N identical requests from spawning N identical Claude calls.
 // All concurrent requests for the same key share one underlying execution.
 const inFlight = new Map<string, Promise<MarketOption[]>>();
 
@@ -83,7 +81,7 @@ function parseMarketLines(text: string): MarketOption[] {
 
 const STUB_LINE = `{"overall_market":"...","niche":"...","micro_niche":"...","market_name":"...","demand":"proven|growing|crowded","description":"...","top_pick":false,"top_pick_reason":"","recommended_sources":[]}`;
 
-// Criteria for the single top-pick recommendation — used in both stub and steer prompts.
+// Criteria for the single top-pick recommendation.
 // Ranked priority chain so Claude has a clear tiebreaker rather than a combined AND filter.
 const TOP_PICK_CRITERIA = `Mark exactly one card as top_pick: true using this ranked priority:
 1. Is someone clearly paying for something broken right now? (strongest signal — proven willingness to pay with visible frustration)
@@ -100,7 +98,7 @@ A "market" is a group of people who share a specific problem and already spend m
 
 ${interestSummary}
 
-Generate exactly 4 DISTINCT market segments. Before assigning demand, use web_search to verify: do real paid tools exist for this niche, and is real user frustration visible in reviews or forums? Use 1-2 searches across the niches — prioritise niches you are uncertain about.
+Generate exactly 4 DISTINCT market segments. Use your knowledge to assess demand for each niche — no web search needed.
 
 IMPORTANT — if two broad markets are listed above: do NOT split cards evenly across each space. Instead, look for the person who lives at the intersection of both — someone whose daily work or life genuinely spans both worlds. All 4 cards should explore different sub-segments of that overlap. If only one broad market is listed: go deep within that single space.
 
@@ -109,7 +107,7 @@ Each segment must describe:
 - niche: a specific segment within it (e.g. "Independent Restaurant Owners", "Freelance Designers")
 - micro_niche: the person and their core frustration in one phrase (e.g. "Independent restaurant owners frustrated by food cost visibility")
 - market_name: 2-4 words naming the PERSON, not a product (e.g. "Independent Restaurant Owners", "Food Truck Operators", "Freelance Designers"). This is the card headline.
-- demand: 'proven' = real paid tools exist AND real user frustration is visible right now | 'growing' = market exists, tools still maturing | 'crowded' = saturated, hard to differentiate
+- demand: 'proven' = well-known paid tools exist AND user frustration is widely documented | 'growing' = market exists, tools still maturing | 'crowded' = saturated, hard to differentiate
 - description: 1-2 sentences on who these people are and why existing solutions frustrate them. No product suggestions. No pricing.
 
 Rules:
@@ -124,39 +122,13 @@ Output each market as a JSON object on its own line (NDJSON). Nothing else — n
 ${STUB_LINE}`;
 }
 
-function steerPrompt(
-  interestSummary: string,
-  existingMarkets: MarketOption[],
-  steer: string[]
-): string {
-  const steerContext = steer.includes('completely different')
-    ? 'Generate markets from a COMPLETELY DIFFERENT category cluster â€” do not use the interests above as the primary lens. Find an unrelated space where their background could still be an edge.'
-    : `Apply these as modifiers: ${steer.join(', ')}. Keep the core interests but adjust direction accordingly.`;
-
-  return `A solo developer interested in "${interestSummary}" was shown these 4 market segments:
-${JSON.stringify(
-  existingMarkets.map(({ market_name, description }) => ({ market_name, description })),
-  null,
-  2
-)}
-
-They want to refine. ${steerContext}
-
-Generate 4 NEW distinct market segments. Each market_name must be the PERSON or GROUP (e.g. "Food Truck Operators"), never a product name. Description should cover who they are, what they pay for, and what frustrates them. No product suggestions.
-
-${TOP_PICK_CRITERIA}
-
-Same format, one JSON object per line:
-${STUB_LINE}`;
-}
-
 // â”€â”€ Handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function POST(req: Request): Promise<Response> {
   const ctx = log.begin();
 
   const body = (await req.json().catch(() => ({}))) as ExcavateBody;
-  const { broadMarkets, description, steer, existingMarkets } = body;
+  const { broadMarkets, description } = body;
 
   if (!broadMarkets?.length && !description?.trim()) {
     return log.end(
@@ -175,7 +147,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const interestSummary = [
-    broadMarkets?.length ? `Confirmed broad markets: ${broadMarkets.join(', ')}` : null,
+    broadMarkets?.length ? `Broad markets: ${broadMarkets.join(', ')}` : null,
     description?.trim() ? `In their own words: "${description.trim()}"` : null,
   ]
     .filter(Boolean)
@@ -184,7 +156,6 @@ export async function POST(req: Request): Promise<Response> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const encoder = new TextEncoder();
 
-  const isSteer = !!(steer?.length && existingMarkets?.length);
   // req.signal does NOT fire inside a streaming response's start() callback —
   // use a local AbortController aborted via the stream's cancel() instead.
   const streamAbort = new AbortController();
@@ -202,41 +173,6 @@ export async function POST(req: Request): Promise<Response> {
       let key: string | undefined;
       let rejectFlight: ((err: unknown) => void) | undefined;
       try {
-        // â”€â”€ Steer path: cheap mutation, no web search (~5â€“10s) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        if (isSteer) {
-          log.info(ctx.reqId, 'Steer path', { steer, existingCount: existingMarkets!.length });
-          const { signal: steerSignal, clear: clearSteer } = timedAbort(
-            AGENT_TIMEOUT_MS,
-            streamAbort.signal
-          );
-          let msg: Awaited<ReturnType<typeof client.messages.create>>;
-          try {
-            msg = await client.messages.create(
-              {
-                model: 'claude-sonnet-4-6',
-                max_tokens: 2048,
-                messages: [
-                  { role: 'user', content: steerPrompt(interestSummary, existingMarkets!, steer!) },
-                ],
-              },
-              { signal: steerSignal }
-            );
-          } finally {
-            clearSteer();
-          }
-          logTokenCost(ctx.reqId, 'steer', msg.usage as Parameters<typeof logTokenCost>[2]);
-          const text = msg.content.find((b) => b.type === 'text')?.text?.trim() ?? '';
-          const markets = parseMarketLines(text);
-          if (markets.length === 0) {
-            flush({ type: 'error', message: 'No markets generated â€” try again' });
-          } else {
-            for (const m of markets) flush({ type: 'market', data: m });
-            flush({ type: 'done' });
-          }
-          controller.close();
-          return;
-        }
-
         // â”€â”€ Cache hit: return immediately â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // ── Cache hit: return immediately ─────────────────────────────────
         key = cacheKey(broadMarkets, description);
@@ -250,7 +186,7 @@ export async function POST(req: Request): Promise<Response> {
         }
 
         // ── In-flight dedup: join an identical concurrent request ──────────────
-        // Prevents N tabs / double-clicks from each firing N × 2 web_search calls.
+        // Prevents N tabs / double-clicks from each firing N identical Claude calls.
         if (inFlight.has(key)) {
           log.info(ctx.reqId, 'In-flight dedup', { key });
           try {
@@ -272,10 +208,10 @@ export async function POST(req: Request): Promise<Response> {
         });
         inFlight.set(key, flightPromise);
 
-        // ── Stub phase: generation + up to 2 web searches for demand verification ──
+        // ── Stub phase: generate 4 market options ───────────────────────────
         log.info(ctx.reqId, 'Stub phase', { broadMarkets, hasDescription: !!description });
         const { signal: callSignal, clear: clearCall } = timedAbort(
-          WEB_SEARCH_TIMEOUT_MS * 2, // 90s — allows up to 2 searches + generation
+          AGENT_TIMEOUT_MS,
           streamAbort.signal
         );
         let stubs: MarketOption[] = [];
@@ -284,13 +220,11 @@ export async function POST(req: Request): Promise<Response> {
             {
               model: 'claude-sonnet-4-6',
               max_tokens: 2048,
-              tools: [{ name: 'web_search', type: 'web_search_20260209' as const, max_uses: 2 }],
               messages: [{ role: 'user', content: stubPrompt(interestSummary) }],
             },
             { signal: callSignal }
           );
           logTokenCost(ctx.reqId, 'stub', stubMsg.usage as Parameters<typeof logTokenCost>[2]);
-          // Tool-use blocks may be interspersed — extract all text blocks
           const stubText = stubMsg.content
             .filter((b) => b.type === 'text')
             .map((b) => (b as { type: 'text'; text: string }).text)
@@ -333,6 +267,6 @@ export async function POST(req: Request): Promise<Response> {
   return log.end(
     ctx,
     new Response(stream, { headers: { 'Content-Type': 'application/x-ndjson' } }),
-    { isSteer, broadMarkets }
+    { broadMarkets }
   );
 }

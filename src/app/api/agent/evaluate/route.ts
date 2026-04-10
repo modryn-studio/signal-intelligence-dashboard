@@ -34,10 +34,7 @@ export interface EvaluationResult {
 }
 
 export interface Synthesis {
-  priority_ids: number[]; // IDs of the 1–2 strongest observe signals — used to auto-accept + form thesis
-  priority: string; // 1 sentence, 20 words max: which 1–2 observe cards to accept first and why
-  patterns: string; // 1 sentence, 20 words max: structural theme or "No clear pattern."
-  thesis_candidate: string; // 1 sentence, 25 words max: the contrarian belief as a direct claim
+  priority_ids: number[]; // IDs of the 1–2 strongest observe signals — used to sort cards + drive bulk accept
 }
 
 // NDJSON stream chunk types
@@ -379,20 +376,15 @@ ${JSON.stringify(
     id: e.id,
     title: e.title,
     reasoning: e.reasoning,
-    proposed_title: e.proposed_title,
   })),
   null,
   2
 )}
 
-Synthesize in one sentence per field. No hedging.
-- priority_ids: IDs of the 1–2 strongest signals (clearest evidence of growth AND poor service). Max 2.
-- priority: ≤20 words. Name the signal(s) using exact title text. State the growth+service-failure intersection.
-- patterns: ≤20 words. Structural theme across observe cards. If none: "No clear pattern."
-- thesis_candidate: ≤25 words. A contrarian belief this data supports — something most would push back on. A belief about how a market is misconfigured, not a product idea.
+Pick the 1–2 strongest signals: clearest evidence of growth AND poor service together.
 
 Respond with ONLY valid JSON, no markdown:
-{"priority_ids":[1,3],"priority":"...","patterns":"...","thesis_candidate":"..."}`;
+{"priority_ids":[1,3]}`;
 
           const { signal: synthSignal, clear: clearSynth } = timedAbort(
             AGENT_TIMEOUT_MS,
@@ -402,7 +394,7 @@ Respond with ONLY valid JSON, no markdown:
             const synthMsg = await client.messages.create(
               {
                 model: 'claude-sonnet-4-6',
-                max_tokens: 1024,
+                max_tokens: 256,
                 messages: [{ role: 'user', content: synthPrompt }],
               },
               { signal: synthSignal }

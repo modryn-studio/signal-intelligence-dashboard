@@ -14,6 +14,7 @@ interface Prefill {
   body: string;
   relatedInputIds: number[];
   title?: string;
+  date?: string;
 }
 
 interface AddObservationModalProps {
@@ -55,7 +56,7 @@ export function AddObservationModal({ open, onClose, onSaved, prefill }: AddObse
           body: body.trim(),
           related_input_ids: prefill?.relatedInputIds ?? [],
           tags: [],
-          date: localDateStr(),
+          date: prefill?.date ?? localDateStr(),
         }),
       });
       if (!res.ok) throw new Error('Failed to save');

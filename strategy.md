@@ -158,6 +158,12 @@ All future tools deploy under `modrynstudio.com` as subdirectory paths — not s
 
 Each tool is its own repo (from the boilerplate). It deploys to a free `.vercel.app` URL. `next.config.ts` in modryn-studio-v2 rewrites `modrynstudio.com/tools/[slug]/*` → the tool's Vercel URL. Google sees one domain and one authority footprint. The tool repo never needs a custom domain.
 
+---
+
+## API Potential
+
+If this tool gets strong traction, could the signal intelligence pipeline be exposed as an API? Developers and teams may want programmatic access to the same signals rather than using the dashboard UI. Worth exploring if retention and usage metrics are strong.
+
 Setup per tool:
 
 1. Tool repo: set `basePath: '/tools/[slug]'` in its `next.config.ts`

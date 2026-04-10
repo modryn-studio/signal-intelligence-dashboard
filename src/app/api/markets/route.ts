@@ -70,6 +70,7 @@ void sql`ALTER TABLE market_sources ADD COLUMN IF NOT EXISTS last_pull_at TIMEST
 void sql`ALTER TABLE markets ADD COLUMN IF NOT EXISTS scan_status TEXT NOT NULL DEFAULT 'idle'`.catch(
   () => {}
 );
+void sql`ALTER TABLE markets ADD COLUMN IF NOT EXISTS broad_market TEXT`.catch(() => {});
 
 void sql`ALTER TABLE signal_inputs ADD COLUMN IF NOT EXISTS market_id INT REFERENCES markets(id)`.catch(
   () => {}
@@ -137,6 +138,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     const body = (await request.json()) as {
       name?: string;
       description?: string;
+      broad_market?: string;
       sources?: {
         source_type?: string;
         value: string;
@@ -145,7 +147,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         status?: string;
       }[];
     };
-    const { name, description, sources } = body;
+    const { name, description, broad_market, sources } = body;
 
     if (!name?.trim()) {
       return Response.json({ error: 'name is required' }, { status: 400 });
@@ -157,8 +159,8 @@ export async function POST(request: NextRequest): Promise<Response> {
     await sql`UPDATE markets SET is_active = false, updated_at = NOW()`;
 
     const [market] = await sql`
-      INSERT INTO markets (name, description, is_active, scan_status)
-      VALUES (${name.trim()}, ${description?.trim() || null}, true, 'pending')
+      INSERT INTO markets (name, description, broad_market, is_active, scan_status)
+      VALUES (${name.trim()}, ${description?.trim() || null}, ${broad_market?.trim() || null}, true, 'pending')
       RETURNING *
     `;
     const marketId = (market as { id: number }).id;

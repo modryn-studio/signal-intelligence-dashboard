@@ -78,9 +78,10 @@ export function DashboardHeader({ marketId }: { marketId?: number } = {}) {
 
   // Prefer marketId prop (known from URL) over is_active flag — avoids stale-cache mismatch
   // when the header renders before the PATCH activating the new market has landed.
+  const markets = Array.isArray(allMarkets) ? allMarkets : [];
   const activeMarket =
-    (marketId ? allMarkets?.find((m) => m.id === marketId) : null) ??
-    allMarkets?.find((m) => m.is_active) ??
+    (marketId ? markets.find((m) => m.id === marketId) : null) ??
+    markets.find((m) => m.is_active) ??
     marketData?.market ??
     null;
   const [digestOpen, setDigestOpen] = useState(false);

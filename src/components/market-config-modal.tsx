@@ -8,6 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Spinner } from '@/components/ui/spinner';
 import type { Market, MarketSource, SourceType } from '@/lib/types';
+import type {
+  DiscoveredSource,
+  DiscoverSourcesChunk,
+} from '@/app/api/agent/discover-sources/route';
 
 interface Props {
   open: boolean;
@@ -74,13 +78,21 @@ export function MarketConfigModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<DiscoveredSource[]>([]);
 
   // Sync when market prop changes
   useEffect(() => {
     setName(market.name);
     setDescription(market.description ?? '');
     setSources(initialSources);
-  }, [market, initialSources]);
+    // Only clear suggestions when switching to a different market, not on source list refresh
+  }, [market.id]);
+
+  // Keep local sources in sync when parent refreshes source list
+  useEffect(() => {
+    setSources(initialSources);
+  }, [initialSources]);
 
   async function handleSave() {
     if (!name.trim()) return;
@@ -154,6 +166,69 @@ export function MarketConfigModal({
     }
   }
 
+  async function handleSuggestSources() {
+    setSuggesting(true);
+    setSuggestions([]);
+    const existingSubreddits = sources
+      .filter((s) => s.source_type === 'subreddit')
+      .map((s) => s.value);
+    try {
+      const res = await fetch('/api/agent/discover-sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          market_name: market.name,
+          micro_niche: market.description ?? market.name,
+          description: market.description ?? undefined,
+          existing_subreddits: existingSubreddits,
+        }),
+      });
+      if (!res.ok || !res.body) throw new Error();
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const chunk = JSON.parse(line) as DiscoverSourcesChunk;
+            if (chunk.type === 'source') {
+              setSuggestions((prev) => [...prev, chunk.data]);
+            }
+          } catch {
+            // skip malformed
+          }
+        }
+      }
+    } catch {
+      setError('Failed to suggest sources. Try again.');
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  async function handleAddSuggestion(s: DiscoveredSource) {
+    const res = await fetch('/api/markets', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: market.id,
+        addSource: { source_type: s.source_type, value: s.value },
+      }),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { sources: MarketSource[] };
+      setSources(data.sources);
+      setSuggestions((prev) => prev.filter((x) => x.value !== s.value));
+      onUpdated();
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="flex max-h-[85vh] max-w-md flex-col">
@@ -207,7 +282,46 @@ export function MarketConfigModal({
 
           {/* Signal sources */}
           <div>
-            <label className="text-foreground mb-2 block text-xs font-medium">Signal sources</label>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-foreground text-xs font-medium">Signal sources</label>
+              <button
+                type="button"
+                onClick={handleSuggestSources}
+                disabled={suggesting}
+                className="text-muted-foreground hover:text-primary flex items-center gap-1 font-mono text-[10px] transition-colors disabled:opacity-40"
+              >
+                {suggesting ? <Spinner className="h-2.5 w-2.5" /> : null}
+                {suggesting ? 'Suggesting…' : 'Suggest sources'}
+              </button>
+            </div>
+            {suggestions.length > 0 && (
+              <ul className="mb-3 space-y-1.5">
+                {suggestions.map((s) => (
+                  <li
+                    key={s.value}
+                    className="border-primary/20 bg-primary/5 flex items-start justify-between gap-2 rounded border px-3 py-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-foreground font-mono text-xs font-medium">
+                        {s.display_name}
+                      </p>
+                      {s.description && (
+                        <p className="text-muted-foreground mt-0.5 text-[11px] leading-tight">
+                          {s.description}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleAddSuggestion(s)}
+                      className="text-primary hover:text-primary/80 shrink-0 font-mono text-[10px] transition-colors"
+                    >
+                      + Add
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
             {sources.length === 0 ? (
               <p className="text-muted-foreground/60 font-mono text-[11px]">None added.</p>
             ) : (
